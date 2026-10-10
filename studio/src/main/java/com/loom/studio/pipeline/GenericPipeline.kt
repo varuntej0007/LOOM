@@ -50,15 +50,17 @@ class GenericPipeline(
     file: File,
     scope: CoroutineScope,
     onEvent: (String) -> Unit,
-) : Pipeline(card, onEvent) {
+    profiles: List<com.loom.studio.chiplets.Profile>? = null,
+) : TensorPipeline(card, onEvent) {
 
     val input = IntervalSource(onEvent)
-    override val inference = InferenceChiplet(card, file, InferenceChiplet.defaultBackend, InferenceChiplet.liteRtProfiles(), scope, onEvent)
+    override val inference = InferenceChiplet(card, file, InferenceChiplet.backendFor(card), profiles ?: InferenceChiplet.profilesFor(card), scope, onEvent)
     val output = Postprocess(card)
     override val display: Display? = null
     override val source: StudioChiplet get() = input
     override val chiplets: List<StudioChiplet> = listOf(input, inference, output)
     override val unitName = "runs"
+    override val unitShort = "runs"
 
     private val buffers: Map<String, ByteBuffer> = card.inputs.mapIndexed { i, t ->
         val bytes = (t.elements * when (t.dtype) { "float32", "int32" -> 4; "int64" -> 8; "float16", "int16" -> 2; else -> 1 }).toInt()
@@ -107,7 +109,7 @@ class GenericPipeline(
                 val tOut = Clock.nowNs()
                 stageMs["inference"] = Clock.ms(t0, tInf)
                 stageMs["postprocess"] = Clock.ms(tInf, tOut)
-                record(Clock.ms(t0, tOut), r)
+                recordUnit(Clock.ms(t0, tOut), r)
                 val wait = maxOf(input.intervalMs, input.paceMs) - Clock.ms(t0, Clock.nowNs()).toLong()
                 if (wait > 0) Thread.sleep(wait)
             } catch (_: InterruptedException) {

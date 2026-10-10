@@ -78,4 +78,27 @@ class WeaverCoreTest {
         assertEquals(19, switched)
         assertEquals(Mode.ADAPTIVE, core.mode)
     }
+
+    @Test fun followsThePlanBeforeItGetsHot() {
+        val core = WeaverCore().apply { goal = 15.0; heatLimit = 0.8f; cutOrder = listOf("display", "inference", "source") }
+        val chips = listOf(
+            ChipState("display", "Display", Level.HIGH, true, false, planLevel = Level.HIGH),
+            ChipState("source", "Capture", Level.HIGH, true, false, rateCap = 30.0, planLevel = Level.BALANCED),
+        )
+        var d: Decision = Decision.Hold("")
+        for (t in 0..5) {
+            d = core.step(Sense(20.0, 25.0, 0.70f, 0, true, true), chips, t.toLong())
+            if (d !is Decision.Hold) break
+        }
+        assertTrue(d.toString(), d is Decision.Lower && d.key == "source")
+    }
+
+    @Test fun neverRaisesAboveThePlan() {
+        val core = WeaverCore().apply { goal = 10.0 }
+        val chips = listOf(ChipState("source", "Capture", Level.BALANCED, true, true, rateCap = 15.0, planLevel = Level.BALANCED, planUpLevel = Level.BALANCED))
+        for (t in 0..20) {
+            val d = core.step(Sense(12.0, 30.0, 0.5f, 0, true, true), chips, t.toLong())
+            assertTrue(d.toString(), d !is Decision.Raise)
+        }
+    }
 }

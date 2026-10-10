@@ -73,12 +73,15 @@ class InferenceChiplet(
     override fun canLower(): Boolean = lowerLevel() != null
     override fun canRaise(): Boolean = higherLevel() != null
 
+    /** A profile may name its own model file (model variants, loom.json projects). */
+    fun fileFor(p: Profile): File = (p.knobs["file"] as? String)?.let { File(it) } ?: file
+
     /** Load the first profile that works on this phone (HIGH, falling back down the list). */
     suspend fun start() {
         for (p in profiles) {
             try {
                 val t0 = Clock.nowNs()
-                val s = backend.load(card, file, p.knobs)
+                val s = backend.load(card, fileFor(p), p.knobs)
                 current = p
                 session = s
                 onSessionLive?.invoke(s)
@@ -111,7 +114,7 @@ class InferenceChiplet(
     private suspend fun build(p: Profile, id: Long, reason: String, from: String) {
         val t0 = Clock.nowNs()
         val s = try {
-            backend.load(card, file, p.knobs)
+            backend.load(card, fileFor(p), p.knobs)
         } catch (t: Throwable) {
             failed += p.label
             Transitions.emit(id, name, "failed", from, p.label, "build failed: ${t.message}", Clock.ms(t0, Clock.nowNs()))
@@ -153,18 +156,38 @@ class InferenceChiplet(
     }
 
     /**
-     * After profiling: re-order profiles so HIGH is the most power-hungry working profile and
-     * ECO the least, by measured battery current (brief §6: best quality → lowest power).
+     * After profiling (brief §6: profiles ordered best quality → lowest power): from every
+     * profile that WORKED on this phone (including extras such as the NPU), drop the dominated
+     * ones (another is cooler, faster and at least as good), then keep up to three spread from
+     * most to least battery current: HIGH, BALANCED, ECO.
      */
-    fun reorder(byMa: Map<String, Double>) {
-        val working = profiles.filter { it.label !in failed && byMa[it.label] != null }
-        if (working.size < 2) return
-        val sorted = working.sortedByDescending { byMa[it.label] }
+    fun reorder(measured: List<Pair<Profile, com.loom.studio.profiler.MeasuredProfile>>) {
+        val ok = measured.filter { (p, m) -> m.ma != null && m.p50Ms != null && p.label !in failed }
+        if (ok.size < 2) return
+        val undominated = ok.filter { (_, a) ->
+            ok.none { (_, b) ->
+                b !== a && b.ma!! <= a.ma!! && b.p50Ms!! <= a.p50Ms!! && (b.quality ?: 1.0) >= (a.quality ?: 1.0) &&
+                    (b.ma!! < a.ma!! || b.p50Ms!! < a.p50Ms!!)
+            }
+        }.ifEmpty { ok }
+        val byPower = undominated.sortedByDescending { it.second.ma }
+        val pick = if (byPower.size <= 3) byPower else listOf(byPower.first(), byPower[byPower.size / 2], byPower.last())
         val levels = Level.entries
-        val re = sorted.take(levels.size).mapIndexed { i, p -> p.copy(level = levels[i]) }
+        val re = pick.mapIndexed { i, (p, _) -> p.copy(level = levels[i]) }
         val currentLabel = current.label
         profiles = re
         current = re.firstOrNull { it.label == currentLabel } ?: current
+    }
+
+    /** Apply a saved order (profiles.json "order") without re-measuring. */
+    fun applyOrder(labels: List<String>, all: List<Profile>) {
+        val re = labels.mapNotNull { l -> all.firstOrNull { it.label == l } }.take(3)
+            .mapIndexed { i, p -> p.copy(level = Level.entries[i]) }
+        if (re.size >= 2) {
+            val cur = current.label
+            profiles = re
+            current = re.firstOrNull { it.label == cur } ?: current
+        }
     }
 
     fun close() {
@@ -181,6 +204,22 @@ class InferenceChiplet(
             add(Profile(Level.BALANCED, "CPU ×4", mapOf("delegate" to "cpu", "threads" to 4)))
             add(Profile(Level.ECO, "CPU ×2", mapOf("delegate" to "cpu", "threads" to 2)))
         }
+
+        /** Extra candidate profiles the profiler measures; kept if they work (M10: NPU). */
+        fun liteRtExtraProfiles(): List<Profile> = listOf(
+            Profile(Level.HIGH, "NPU (NNAPI)", mapOf("delegate" to "nnapi")),
+        )
+
+        /** ONNX Runtime: QNN HTP (NPU), CPU ×4, CPU ×2. */
+        fun onnxProfiles(): List<Profile> = listOf(
+            Profile(Level.HIGH, "NPU (QNN HTP)", mapOf("delegate" to "qnn")),
+            Profile(Level.BALANCED, "CPU ×4", mapOf("delegate" to "cpu", "threads" to 4)),
+            Profile(Level.ECO, "CPU ×2", mapOf("delegate" to "cpu", "threads" to 2)),
+        )
+
+        fun profilesFor(card: ModelCard): List<Profile> = if (card.runFormat == "onnx") onnxProfiles() else liteRtProfiles()
+
+        fun backendFor(card: ModelCard): Backend = if (card.runFormat == "onnx") com.loom.studio.runtime.OnnxBackend() else defaultBackend
 
         val defaultBackend: Backend by lazy { LiteRtBackend() }
     }

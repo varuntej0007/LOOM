@@ -31,6 +31,8 @@ data class ProfileTable(
     val chargingDuring: Boolean,
     val idleMa: Double?,
     val rows: List<MeasuredProfile>,
+    /** Inference profiles chosen after measuring (HIGH → ECO). */
+    val order: List<String> = emptyList(),
 ) {
     fun rows(key: String) = rows.filter { it.chiplet == key }
     fun row(key: String, label: String) = rows.firstOrNull { it.chiplet == key && it.label == label }
@@ -43,6 +45,7 @@ data class ProfileTable(
         .put("created_at", createdAt)
         .put("charging_during", chargingDuring)
         .put("idle_mA", idleMa ?: JSONObject.NULL)
+        .put("order", JSONArray(order))
         .put("chiplets", JSONObject().also { o ->
             rows.groupBy { it.chiplet }.forEach { (k, rs) ->
                 o.put(k, JSONArray(rs.map { r ->
@@ -77,8 +80,9 @@ data class ProfileTable(
                             r.d("quality"), if (r.isNull("note")) null else r.optString("note"))
                     }
                 }
+                val order = j.optJSONArray("order")?.let { a -> (0 until a.length()).map { a.getString(it) } } ?: emptyList()
                 ProfileTable(j.optString("model_id"), j.optString("model"), j.optString("device"),
-                    j.optLong("created_at"), j.optBoolean("charging_during"), j.d("idle_mA"), rows)
+                    j.optLong("created_at"), j.optBoolean("charging_during"), j.d("idle_mA"), rows, order)
             }
         } catch (_: Throwable) {
             null

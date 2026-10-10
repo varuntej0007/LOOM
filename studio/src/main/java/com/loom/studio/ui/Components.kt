@@ -136,6 +136,7 @@ fun WeaverPill(
     onMode: (Mode) -> Unit,
     onManual: (String, Level) -> Unit,
     dark: Boolean = true,
+    extra: @Composable () -> Unit = {},
 ) {
     var open by remember { mutableStateOf(false) }
     val bg = if (dark) Color(0xCC0B1220) else Loom.Card
@@ -178,6 +179,8 @@ fun WeaverPill(
                         ChipRow(levels.map { it.name.take(4) }, levels.indexOf(cur)) { onManual(key, levels[it]) }
                     }
                 }
+                Spacer(Modifier.height(6.dp))
+                extra()
             }
         }
     }

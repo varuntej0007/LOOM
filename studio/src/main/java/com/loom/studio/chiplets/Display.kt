@@ -27,6 +27,8 @@ class Display(onEvent: (String) -> Unit) : KnobChiplet(
     val brightness: StateFlow<Float?> = _brightness
 
     /** Upright frame size of the published result (overlay scaling). */
+    /** loom.json output.overlay = false hides boxes (results still logged). */
+    @Volatile var overlayOn = true
     @Volatile var frameW = 0
     @Volatile var frameH = 0
 
@@ -50,7 +52,7 @@ class Display(onEvent: (String) -> Unit) : KnobChiplet(
         lastPublishNs = t0
         frameW = w
         frameH = h
-        _result.value = r
+        _result.value = if (overlayOn) r else null
         lastMs = (System.nanoTime() - t0) / 1e6
     }
 

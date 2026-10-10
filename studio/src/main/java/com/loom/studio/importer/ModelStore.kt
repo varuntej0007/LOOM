@@ -19,6 +19,8 @@ data class ModelSettings(
         /** Cut what the user notices least first: screen, then model quality, then frames. */
         val DEFAULT_VISION_CUT = listOf("display", "inference", "source")
         val DEFAULT_GENERIC_CUT = listOf("inference", "source")
+        /** LLM: Voice → UI refresh → token-rate cap → threads → context length (brief §6). */
+        val DEFAULT_LLM_CUT = listOf("voice", "ui", "rate", "inference", "context")
     }
 }
 
@@ -28,6 +30,8 @@ class ModelStore(context: Context) {
 
     fun dir(id: String) = File(root, id)
     fun modelFile(card: ModelCard) = File(dir(card.id), card.fileName)
+    /** The file a tensor runtime loads (inner .tflite of a MediaPipe vision bundle, else the model). */
+    fun runFile(card: ModelCard) = File(dir(card.id), card.runFile)
     fun profilesFile(id: String) = File(dir(id), "profiles.json")
 
     fun list(): List<ModelCard> =
@@ -50,8 +54,12 @@ class ModelStore(context: Context) {
 
     fun loadSettings(card: ModelCard): ModelSettings {
         val default = ModelSettings(
-            cutOrder = if (card.kind == TaskKind.VISION) ModelSettings.DEFAULT_VISION_CUT else ModelSettings.DEFAULT_GENERIC_CUT,
-            goalFps = if (card.kind == TaskKind.VISION) 15.0 else 10.0,
+            cutOrder = when (card.kind) {
+                TaskKind.VISION -> ModelSettings.DEFAULT_VISION_CUT
+                TaskKind.LLM -> ModelSettings.DEFAULT_LLM_CUT
+                else -> ModelSettings.DEFAULT_GENERIC_CUT
+            },
+            goalFps = when (card.kind) { TaskKind.VISION -> 15.0; TaskKind.LLM -> 8.0; else -> 10.0 },
         )
         return try {
             val f = File(dir(card.id), "settings.json")
@@ -60,7 +68,7 @@ class ModelStore(context: Context) {
             ModelSettings(
                 goalFps = j.optDouble("goal_fps", default.goalFps).coerceIn(1.0, 60.0),
                 cutOrder = j.optJSONArray("cut_order")?.let { a -> (0 until a.length()).map { a.getString(it) } }
-                    ?.filter { it in default.cutOrder }?.let { it + (default.cutOrder - it.toSet()) } ?: default.cutOrder,
+                    ?.let { saved -> saved + (default.cutOrder - saved.toSet()) } ?: default.cutOrder,
                 heatLimit = j.optDouble("heat_limit", default.heatLimit.toDouble()).toFloat().coerceIn(0.3f, 1.2f),
             )
         } catch (_: Throwable) {
@@ -74,6 +82,10 @@ class ModelStore(context: Context) {
             .put("cut_order", JSONArray(s.cutOrder))
             .put("heat_limit", s.heatLimit.toDouble())
         atomicWrite(File(dir(id), "settings.json"), j.toString(2))
+    }
+
+    fun project(card: ModelCard): ProjectSpec? = card.projectFile?.let { f ->
+        try { ProjectParser.parse(File(dir(card.id), f).readText()) } catch (_: Throwable) { null }
     }
 
     fun delete(id: String) {
@@ -118,6 +130,8 @@ class ModelStore(context: Context) {
             .put("ram_warning", c.ramWarning ?: JSONObject.NULL)
             .put("imported_at", c.importedAt)
             .put("overridden", c.overridden)
+            .put("inner_file", c.innerFile ?: JSONObject.NULL)
+            .put("project_file", c.projectFile ?: JSONObject.NULL)
 
         fun cardFromJson(j: JSONObject): ModelCard {
             fun tensors(k: String) = j.optJSONArray(k)?.let { a -> (0 until a.length()).map { tensorFromJson(a.getJSONObject(it)) } } ?: emptyList()
@@ -150,6 +164,8 @@ class ModelStore(context: Context) {
                 ramWarning = if (j.isNull("ram_warning")) null else j.optString("ram_warning"),
                 importedAt = j.optLong("imported_at", 0L),
                 overridden = j.optBoolean("overridden", false),
+                innerFile = if (j.isNull("inner_file")) null else j.optString("inner_file").ifEmpty { null },
+                projectFile = if (j.isNull("project_file")) null else j.optString("project_file").ifEmpty { null },
             )
         }
     }

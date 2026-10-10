@@ -30,6 +30,10 @@ data class ChipState(
     val lowerIsFaster: Boolean? = null,
     /** For the source: the unit-rate cap of the current profile (e.g. camera 15/s). */
     val rateCap: Double? = null,
+    /** The policy table's level for this chiplet at the current goal and heat (null = no plan). */
+    val planLevel: Level? = null,
+    /** The plan one hysteresis step hotter (upgrades never go above it). */
+    val planUpLevel: Level? = null,
 )
 
 /** One second of sensing. */
@@ -73,13 +77,14 @@ class WeaverCore(val policy: Policy = Policy()) {
     private var hotSecs = 0
     private var slackSecs = 0
     private var severeSecs = 0
+    private var planSecs = 0
     private var cooldown = 0
     private var floorNoted = false
     private class Backoff(var blockedUntil: Long = 0, var length: Int = 0, var lastRaise: Long = -1_000_000)
     private val backoff = HashMap<String, Backoff>()
 
     fun resetWindows() {
-        belowSecs = 0; hotSecs = 0; slackSecs = 0
+        belowSecs = 0; hotSecs = 0; slackSecs = 0; planSecs = 0
     }
 
     fun step(s: Sense, chips: List<ChipState>, nowSec: Long): Decision {
@@ -114,6 +119,9 @@ class WeaverCore(val policy: Policy = Policy()) {
 
         val byKey = chips.associateBy { it.key }
         val order = cutOrder.mapNotNull { byKey[it] } + chips.filter { it.key !in cutOrder }
+        // Feed-forward from the policy table: chiplets running above the plan for this heat band.
+        val overPlan = order.filter { c -> c.planLevel != null && c.level.ordinal < c.planLevel.ordinal && c.canLower }
+        planSecs = if (overPlan.isNotEmpty() && !hot && !below) planSecs + 1 else 0
 
         if (hotSecs >= policy.hotSeconds) {
             val why = "heat ${f3(s.heat)} > ${f2(limit!!)}"
@@ -128,13 +136,21 @@ class WeaverCore(val policy: Policy = Policy()) {
                 ?: return floor("$why (no measured faster profile)")
             return lower(pick, why, nowSec)
         }
+        if (planSecs >= PLAN_SECONDS) {
+            val c = overPlan.first()
+            return lower(c, "plan for heat ${f3(s.heat)}: ${c.name} → ${c.planLevel!!.name}", nowSec)
+        }
         if (slackSecs >= policy.slackSeconds) {
             val why = "capacity ${f1(s.capacity)} ≥ ${f1(goal + policy.slackMargin)}/s" +
                 (if (limit != null && heatKnown) " and heat ${f2(s.heat)} < ${f2(limit - policy.coolMargin)}" else "") + " for $slackSecs s"
-            val pick = order.reversed().firstOrNull { it.canRaise && nowSec >= (backoff[it.key]?.blockedUntil ?: 0L) }
+            // Never above the plan for this heat: it already priced in the next 3 minutes.
+            val pick = order.reversed().firstOrNull { c ->
+                c.canRaise && nowSec >= (backoff[c.key]?.blockedUntil ?: 0L) &&
+                    (c.planUpLevel == null || c.level.ordinal > c.planUpLevel.ordinal)
+            }
             if (pick == null) {
                 slackSecs = 0
-                return Decision.Hold("best quality, goal met")
+                return Decision.Hold(if (chips.any { it.planUpLevel != null }) "at plan for this heat" else "best quality, goal met")
             }
             return raise(pick, why, nowSec)
         }
@@ -143,6 +159,7 @@ class WeaverCore(val policy: Policy = Policy()) {
             when {
                 hot -> "too warm $hotSecs/${policy.hotSeconds} s"
                 below -> "below goal $belowSecs/${policy.violationSeconds} s"
+                overPlan.isNotEmpty() -> "above plan $planSecs/$PLAN_SECONDS s"
                 comfortable -> "slack $slackSecs/${policy.slackSeconds} s"
                 !cool -> "warm — holding, no upgrades"
                 else -> "holding"
@@ -186,6 +203,7 @@ class WeaverCore(val policy: Policy = Policy()) {
 
     companion object {
         const val THERMAL_SEVERE = 3
+        const val PLAN_SECONDS = 3
         fun f1(v: Double) = String.format(Locale.US, "%.1f", v)
         fun f2(v: Double) = String.format(Locale.US, "%.2f", v)
         fun f2(v: Float) = String.format(Locale.US, "%.2f", v)

@@ -46,11 +46,18 @@ fun ModelDetailScreen(
     onRun: () -> Unit,
     onProfile: () -> Unit,
     onInspect: () -> Unit,
+    policySource: String? = null,
+    lastCompare: String? = null,
 ) {
     var s by remember(card.id, settings) { mutableStateOf(settings) }
     val chain = remember(card.id) { PipelineFactory.describe(card) }
-    val goals = if (PipelineFactory.usesCamera(card)) listOf(10.0, 15.0, 20.0, 24.0) else listOf(2.0, 5.0, 10.0, 20.0)
-    val unit = if (PipelineFactory.usesCamera(card)) "FPS" else "runs/s"
+    val llm = card.kind == com.loom.studio.core.TaskKind.LLM
+    val goals = when {
+        llm -> listOf(4.0, 8.0, 12.0, 16.0)
+        PipelineFactory.usesCamera(card) -> listOf(10.0, 15.0, 20.0, 24.0)
+        else -> listOf(2.0, 5.0, 10.0, 20.0)
+    }
+    val unit = when { llm -> "tok/s"; PipelineFactory.usesCamera(card) -> "FPS"; else -> "runs/s" }
     LazyColumn(
         modifier = Modifier.fillMaxSize().statusBarsPadding(),
         contentPadding = PaddingValues(16.dp),
@@ -68,6 +75,8 @@ fun ModelDetailScreen(
                         if (table.chargingDuring) " (charging — mA not valid)" else "",
                     color = if (table == null) Loom.Amber else Loom.Green, fontSize = 13.sp,
                 )
+                Text("Planner: " + (policySource ?: "none yet (Run → LOOM panel → Plan / Import policy)"), color = Loom.Muted, fontSize = 13.sp)
+                lastCompare?.let { Text("Last Compare: $it", color = Loom.Blue, fontSize = 13.sp, fontWeight = FontWeight.SemiBold) }
                 Spacer(Modifier.height(10.dp))
                 Row {
                     PrimaryButton("▶  Run", onClick = onRun)

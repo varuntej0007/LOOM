@@ -23,15 +23,25 @@ class VisionPipeline(
     file: File,
     scope: CoroutineScope,
     onEvent: (String) -> Unit,
-) : Pipeline(card, onEvent), ImageAnalysis.Analyzer {
+    profiles: List<com.loom.studio.chiplets.Profile>? = null,
+    private val project: com.loom.studio.importer.ProjectSpec? = null,
+    appContext: android.content.Context? = null,
+    projectDir: java.io.File? = null,
+) : TensorPipeline(card, onEvent), ImageAnalysis.Analyzer {
 
-    val camera = CameraSource(onEvent)
+    val camera = CameraSource(onEvent, project?.fpsProfiles ?: listOf(30, 15, 10))
     val preprocess = Preprocess(card)
-    override val inference = InferenceChiplet(card, file, InferenceChiplet.defaultBackend, InferenceChiplet.liteRtProfiles(), scope, onEvent)
-    val postprocess = Postprocess(card)
-    override val display = Display(onEvent)
+    override val inference = InferenceChiplet(card, file, InferenceChiplet.backendFor(card), profiles ?: InferenceChiplet.profilesFor(card), scope, onEvent)
+    val postprocess = Postprocess(card, project?.scoreThreshold ?: 0.4f)
+    override val display = Display(onEvent).also { it.overlayOn = project?.overlay ?: true }
+    /** loom.json chain: detector → classifier on the top box crops (brief §10). */
+    val stage2: Stage2Classifier? = project?.classifier?.let { m ->
+        Stage2Classifier(java.io.File(projectDir ?: file.parentFile, m.file), onEvent)
+    }
+    /** output.speak: the top labels are spoken (Voice chiplet). */
+    val voice: com.loom.studio.chiplets.Voice? = if (project?.speak == true && appContext != null) com.loom.studio.chiplets.Voice(appContext, onEvent, vision = true) else null
     override val source: StudioChiplet get() = camera
-    override val chiplets: List<StudioChiplet> = listOf(camera, preprocess, inference, postprocess, display)
+    override val chiplets: List<StudioChiplet> = listOfNotNull(camera, preprocess, inference, postprocess, stage2, display, voice)
 
     /** Profiler hook: called with the Preprocess chiplet after each processed frame. */
     @Volatile var frameTap: ((Preprocess) -> Unit)? = null
@@ -44,6 +54,13 @@ class VisionPipeline(
 
     override suspend fun start() {
         inference.start()
+        stage2?.start()
+    }
+
+    override fun close() {
+        super.close()
+        stage2?.close()
+        voice?.shutdown()
     }
 
     override fun setPace(unitsPerSec: Double?) {
@@ -79,7 +96,9 @@ class VisionPipeline(
         } ?: return
         val tInf = Clock.nowNs()
         adpf.report(Clock.ms(tPre, tInf))
-        val r = postprocess.process(unitNo++, out)
+        var r = postprocess.process(unitNo++, out)
+        stage2?.let { s2 -> r = s2.refine(r, preprocess) }
+        voice?.speakLabels(r.boxes.map { it.label } + r.labels.map { it.first })
         val tPost = Clock.nowNs()
         display.publish(r, preprocess.frameW, preprocess.frameH)
         val tDsp = Clock.nowNs()
@@ -88,6 +107,6 @@ class VisionPipeline(
         stageMs["inference"] = Clock.ms(tPre, tInf)
         stageMs["postprocess"] = Clock.ms(tInf, tPost)
         stageMs["display"] = Clock.ms(tPost, tDsp)
-        record(Clock.ms(t0, tDsp), r)
+        recordUnit(Clock.ms(t0, tDsp), r)
     }
 }

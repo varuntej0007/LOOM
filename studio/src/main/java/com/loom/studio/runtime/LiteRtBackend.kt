@@ -105,6 +105,19 @@ class LiteRtSession private constructor(
                         delegate = GpuDelegate(gpuOpts)
                         opts.addDelegate(delegate)
                         label = "GPU"
+                    } else if (knobs["delegate"] == "nnapi") {
+                        // M10: Android NNAPI routes to the vendor NPU/DSP driver when one exists.
+                        // Deprecated in Android 15 but still shipped; NNAPI's own CPU path is
+                        // disabled so a "NPU" profile never silently means "slow reference CPU".
+                        val nn = org.tensorflow.lite.nnapi.NnApiDelegate(
+                            org.tensorflow.lite.nnapi.NnApiDelegate.Options()
+                                .setAllowFp16(true)
+                                .setUseNnapiCpu(false)
+                                .setExecutionPreference(org.tensorflow.lite.nnapi.NnApiDelegate.Options.EXECUTION_PREFERENCE_SUSTAINED_SPEED)
+                        )
+                        delegate = nn
+                        opts.addDelegate(nn)
+                        label = "NPU (NNAPI)"
                     } else {
                         opts.setNumThreads(threads)
                         opts.setUseXNNPACK(true)

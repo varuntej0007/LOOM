@@ -5,7 +5,7 @@ import com.loom.studio.chiplets.StudioChiplet
 import com.loom.studio.core.Level
 import com.loom.studio.core.Mode
 import com.loom.studio.importer.ModelSettings
-import com.loom.studio.pipeline.GenericPipeline
+import com.loom.studio.pipeline.IntervalSource
 import com.loom.studio.pipeline.Pipeline
 import com.loom.studio.profiler.ProfileTable
 import com.loom.studio.telemetry.ChipletLive
@@ -32,6 +32,9 @@ data class WeaverState(
     val stress: StressMode = StressMode.OFF,
     val levels: Map<String, Level> = emptyMap(),
     val goalMet: Boolean = false,
+    val policySource: String = "reflex",
+    val planText: String? = null,
+    val quality: Double? = null,
 )
 
 /**
@@ -47,6 +50,8 @@ class Weaver(
     @Volatile var profiles: ProfileTable?,
     private val stress: StressLoad,
     private val modelFile: java.io.File,
+    @Volatile var policy: PolicyTable? = null,
+    val history: RunHistory = RunHistory(),
 ) {
     val core = WeaverCore().apply {
         goal = settings.goalFps
@@ -66,6 +71,8 @@ class Weaver(
     private var decisions = 0
     private var lastDecision = "—"
     private var lastStatus = "starting"
+    @Volatile var plan: Plan? = null
+        private set
 
     private fun note(msg: String) {
         lastDecision = msg
@@ -147,9 +154,13 @@ class Weaver(
         val sourceActive = when {
             pipeline.paused -> false
             cam != null -> camFps >= 1.0
-            pipeline is GenericPipeline -> true
-            else -> true
+            else -> pipeline.sourceActive
         }
+        val ma = signals.batteryCurrentRaw.takeIf { it != Long.MIN_VALUE }?.let { kotlin.math.abs(it) / 1000.0 }
+        if (ma != null && !signals.charging && !heat.isNaN()) history.add(RunHistory.S(sec.toDouble(), signals.thermalHeadroom.toDouble(), ma))
+        val pol = if (core.mode == Mode.ADAPTIVE) policy else null
+        plan = pol?.lookup(core.goal, heat)
+        val planUp = pol?.lookup(core.goal, heat + 0.02f)
         val chips = adaptive().map { c ->
             ChipState(
                 key = c.key,
@@ -158,10 +169,17 @@ class Weaver(
                 canLower = c.canLower(),
                 canRaise = c.canRaise(),
                 lowerIsFaster = lowerIsFaster(c),
-                rateCap = (c as? CameraSource)?.rateCap?.toDouble(),
+                rateCap = when {
+                    c is CameraSource -> c.rateCap.toDouble()
+                    c is IntervalSource -> c.intervalMs.takeIf { it > 0 }?.let { 1000.0 / it }
+                    c.key == "rate" -> (c.current.knobs["cap"] as? Double)?.takeIf { it > 0 }
+                    else -> null
+                },
+                planLevel = plan?.levels?.get(c.name)?.let { n -> Level.entries.firstOrNull { it.name == n } },
+                planUpLevel = planUp?.levels?.get(c.name)?.let { n -> Level.entries.firstOrNull { it.name == n } },
             )
         }
-        val sense = Sense(metric, pipeline.capacity, heat, signals.thermalStatus, sourceActive, pipeline.inference.isReady)
+        val sense = Sense(metric, pipeline.capacity, heat, signals.thermalStatus, sourceActive, pipeline.ready)
         val d = core.step(sense, chips, sec)
         when (d) {
             is Decision.Lower -> apply(d.key, lower = true, d.reason)
@@ -189,7 +207,9 @@ class Weaver(
             decisions = decisions,
             lastSwap = pipeline.lastSwap,
             heatLimit = core.heatLimit,
-            policySource = if (profiles != null) "measured profiles + reflex" else "reflex (not profiled yet)",
+            policySource = policy?.sourceLabel ?: if (profiles != null) "measured profiles + reflex" else "reflex (not profiled yet)",
+            plan = plan,
+            quality = pipeline.quality,
             units = processed,
             p50Ms = pipeline.p50Ms,
             p90Ms = pipeline.p90Ms,
@@ -225,6 +245,9 @@ class Weaver(
             stress = stress.mode,
             levels = adaptive().associate { it.key to it.level },
             goalMet = metric >= core.goal - core.policy.tolerance,
+            policySource = policy?.sourceLabel ?: if (profiles != null) "measured + reflex" else "reflex",
+            planText = plan?.let { p -> "${p.bucket}: " + p.levels.entries.joinToString(" · ") { (k, v) -> "$k ${v.take(4)}" } },
+            quality = pipeline.quality,
         )
     }
 

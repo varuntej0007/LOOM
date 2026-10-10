@@ -15,14 +15,10 @@ import kotlin.math.min
  *  - Software lever: anything above the cap is skipped evenly; pacing (Adaptive) also limits
  *    processing to goal + 3 per second.
  */
-class CameraSource(private val onEvent: (String) -> Unit) : KnobChiplet(
+class CameraSource(private val onEvent: (String) -> Unit, fpsProfiles: List<Int> = listOf(30, 15, 10)) : KnobChiplet(
     name = "Capture",
     key = "source",
-    profiles = listOf(
-        Profile(Level.HIGH, "camera 30/s", mapOf("fps" to 30)),
-        Profile(Level.BALANCED, "camera 15/s", mapOf("fps" to 15)),
-        Profile(Level.ECO, "camera 10/s", mapOf("fps" to 10)),
-    ),
+    profiles = fpsProfiles.take(3).mapIndexed { i, f -> Profile(Level.entries[i], "camera $f/s", mapOf("fps" to f)) },
     onEvent = onEvent,
 ) {
     interface HardwareRate {
@@ -31,7 +27,7 @@ class CameraSource(private val onEvent: (String) -> Unit) : KnobChiplet(
     }
 
     val fullRateFps = FULL_RATE
-    @Volatile var rateCap: Int = FULL_RATE
+    @Volatile var rateCap: Int = (profiles.first().knobs["fps"] as? Int) ?: FULL_RATE
         private set
     @Volatile var cameraFps: Int = FULL_RATE
         private set

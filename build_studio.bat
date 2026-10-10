@@ -113,6 +113,26 @@ if not exist "%GZIP%" (
 )
 call :log PASS "Gradle 8.11.1 zip present"
 
+rem ---------- 3b. llama.cpp sources (GGUF chat, pinned tag b11552) ----------
+if not exist "studio\src\main\cpp\llama.cpp\CMakeLists.txt" (
+  echo [..] fetching llama.cpp b11552 ^(source for the GGUF chat runtime, first run only^)
+  where git >nul 2>nul
+  if errorlevel 1 (
+    call :log FAIL "git is needed once to fetch llama.cpp - install Git for Windows and run again"
+    goto :fail
+  )
+  if exist ".git" git submodule update --init --depth 1 studio/src/main/cpp/llama.cpp >> "%LOGS%\llama_fetch.log" 2>&1
+  if not exist "studio\src\main\cpp\llama.cpp\CMakeLists.txt" (
+    rmdir /s /q "studio\src\main\cpp\llama.cpp" 2>nul
+    git clone -q --depth 1 --branch b11552 https://github.com/ggml-org/llama.cpp "studio\src\main\cpp\llama.cpp" >> "%LOGS%\llama_fetch.log" 2>&1
+  )
+  if not exist "studio\src\main\cpp\llama.cpp\CMakeLists.txt" (
+    call :log FAIL "could not fetch llama.cpp - see %LOGS%\llama_fetch.log"
+    goto :fail
+  )
+)
+call :log PASS "llama.cpp sources present"
+
 rem ---------- 4a. Unit tests (inspector rules, GGUF reader, Weaver decisions, quality proxy) ----------
 echo [..] running :studio unit tests ^(log: %LOGS%\unit_tests.log^)
 call gradlew.bat --no-daemon --console=plain :studio:testDebugUnitTest > "%LOGS%\unit_tests.log" 2>&1
@@ -124,7 +144,7 @@ if errorlevel 1 (
 call :log PASS "unit tests passed"
 
 rem ---------- 4. Build ----------
-echo [..] building :studio debug APK. First run downloads AGP 8.7.3, SDK 35 and libraries ^(several minutes^).
+echo [..] building :studio debug APK. First run downloads AGP 8.7.3, SDK 35, NDK, CMake and libraries, and compiles llama.cpp ^(10-20 min^).
 echo      Full log: %LOGS%\gradle_build.log
 set "GRADLE_OPTS=-Djava.net.preferIPv4Stack=true"
 call gradlew.bat --no-daemon --console=plain :studio:assembleDebug > "%LOGS%\gradle_build.log" 2>&1
@@ -181,7 +201,14 @@ rem Sample models for the import test: put both EfficientDet variants in the pho
 for %%M in (efficientdet_lite0 efficientdet_lite2) do (
   if exist "app\src\main\assets\%%M.tflite" "%ADB%" -s %DEVICE% push "app\src\main\assets\%%M.tflite" /sdcard/Download/%%M.tflite >nul 2>&1
 )
-call :log PASS "sample models copied to the phone's Download folder"
+rem M7 sample LOOM projects (valid + invalid) in Download\LOOM_sample_project and LOOM_invalid_project.
+"%ADB%" -s %DEVICE% shell mkdir -p /sdcard/Download/LOOM_sample_project /sdcard/Download/LOOM_invalid_project >nul 2>&1
+"%ADB%" -s %DEVICE% push "studio\samples\street_sign_reader\loom.json" /sdcard/Download/LOOM_sample_project/loom.json >nul 2>&1
+"%ADB%" -s %DEVICE% push "studio\samples\street_sign_reader\labels.txt" /sdcard/Download/LOOM_sample_project/labels.txt >nul 2>&1
+"%ADB%" -s %DEVICE% push "app\src\main\assets\efficientdet_lite2.tflite" /sdcard/Download/LOOM_sample_project/detector_large.tflite >nul 2>&1
+"%ADB%" -s %DEVICE% push "app\src\main\assets\efficientdet_lite0.tflite" /sdcard/Download/LOOM_sample_project/detector_small.tflite >nul 2>&1
+"%ADB%" -s %DEVICE% push "studio\samples\invalid_project\loom.json" /sdcard/Download/LOOM_invalid_project/loom.json >nul 2>&1
+call :log PASS "sample models and LOOM projects copied to the phone's Download folder"
 
 rem Notification permission up front (Android 13+), so the run-service notification is visible.
 "%ADB%" -s %DEVICE% shell pm grant com.loom.studio android.permission.POST_NOTIFICATIONS >nul 2>&1

@@ -16,10 +16,32 @@ android {
         applicationId = "com.loom.studio"
         minSdk = 30 // PowerManager.getThermalHeadroom() needs API 30
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.4.0-m4"
+        versionCode = 3
+        versionName = "1.0.0-m10"
         // The iQOO 15 is arm64; native runtimes (LiteRT, llama.cpp) will ship arm64 only.
         ndk { abiFilters += listOf("arm64-v8a") }
+        externalNativeBuild {
+            cmake {
+                arguments += listOf("-DCMAKE_BUILD_TYPE=Release", "-DANDROID_STL=c++_static")
+                cppFlags += listOf("-O3")
+            }
+        }
+    }
+
+    // llama.cpp (GGUF chat) built from source with the NDK; sources fetched by build_studio.bat.
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
+    }
+
+    packaging {
+        jniLibs {
+            // ONNX Runtime, MediaPipe and LiteRT may each carry common runtime libs.
+            pickFirsts += listOf("**/libc++_shared.so", "**/libtensorflowlite_jni.so")
+            useLegacyPackaging = false
+        }
     }
 
     buildTypes {
@@ -62,6 +84,10 @@ dependencies {
     // with this repo's Kotlin 2.0.21). LiteRT 2.x (CompiledModel API) pulls lifecycle 2.10 /
     // Kotlin 2.2 artifacts that this toolchain cannot consume.
     val litert = "1.4.2"
+    // ONNX Runtime with the Qualcomm QNN execution provider (Hexagon NPU = M10's NPU profile).
+    val onnxRuntime = "1.29.0"
+    // MediaPipe LLM Inference for .task chat models (Java API; maintenance mode upstream).
+    val mediapipeGenai = "0.10.24"
 
     implementation(platform("androidx.compose:compose-bom:2024.12.01"))
     implementation("androidx.compose.ui:ui")
@@ -83,5 +109,10 @@ dependencies {
     implementation("com.google.ai.edge.litert:litert-gpu:$litert")
     implementation("com.google.ai.edge.litert:litert-gpu-api:$litert")
 
+    implementation("com.microsoft.onnxruntime:onnxruntime-android-qnn:$onnxRuntime")
+    implementation("com.google.mediapipe:tasks-genai:$mediapipeGenai")
+
     testImplementation("junit:junit:4.13.2")
+    // Real org.json for JVM unit tests (the Android stub returns defaults).
+    testImplementation("org.json:json:20240303")
 }

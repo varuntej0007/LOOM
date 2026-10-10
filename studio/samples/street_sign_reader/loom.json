@@ -1,0 +1,60 @@
+{
+  "loom_project": 1,
+  "name": "Street sign reader",
+  "task": "vision",
+  "goal": {
+    "metric": "fps",
+    "value": 15
+  },
+  "source": {
+    "type": "camera",
+    "fps_profiles": [
+      30,
+      15,
+      10
+    ]
+  },
+  "models": [
+    {
+      "id": "det_hi",
+      "file": "detector_large.tflite",
+      "role": "inference",
+      "level": "HIGH"
+    },
+    {
+      "id": "det_lo",
+      "file": "detector_small.tflite",
+      "role": "inference",
+      "level": "BALANCED"
+    }
+  ],
+  "preprocess": {
+    "resize": [
+      320,
+      320
+    ],
+    "normalize": {
+      "mean": [
+        127.5
+      ],
+      "std": [
+        127.5
+      ]
+    }
+  },
+  "postprocess": {
+    "type": "detection",
+    "score_threshold": 0.4,
+    "labels": "labels.txt"
+  },
+  "output": {
+    "overlay": true,
+    "speak": false
+  },
+  "cut_order": [
+    "display",
+    "inference",
+    "source"
+  ],
+  "heat_limit": 0.8
+}

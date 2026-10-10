@@ -57,6 +57,9 @@ data class RunContext(
     val conf: Double = 0.0,
     val stress: String = "OFF",
     val adpf: Boolean = false,
+    val plan: com.loom.studio.weaver.Plan? = null,
+    val quality: Double? = null,
+    val compare: String? = null,
 )
 
 /** What the in-app LOOM pill shows; the same numbers that go out on LOOM_LIVE. */
@@ -151,11 +154,16 @@ class TelemetryBus(private val appContext: Context) {
             .put("conf", numD(r.conf))
             .put("status", r.status)
             .put("policy", r.policySource ?: NULL)
-            .put("plan", NULL)
+            .put("plan", r.plan?.let { p ->
+                JSONObject().put("bucket", p.bucket).put("goal", p.goal).put("heat_lo", p.heatLo).put("heat_hi", p.heatHi)
+                    .put("text", p.labels.values.joinToString(" · ")).put("predicted_mA", p.predictedMa)
+                    .put("reachable", p.reachable).put("p_optimal", NULL)
+                    .put("levels", JSONObject(p.levels as Map<*, *>))
+            } ?: NULL)
             .put("decision", r.decision)
             .put("decisions", r.decisions)
             .put("last_swap", r.lastSwap)
-            .put("run", NULL)
+            .put("run", r.compare ?: NULL)
             .put("csv", "")
             .put("chiplets", chiplets)
             // --- Studio additions ---
@@ -167,6 +175,7 @@ class TelemetryBus(private val appContext: Context) {
             .put("metric_value", metric?.let { numD(it) } ?: NULL)
             .put("units", r.units)
             .put("adpf", r.adpf)
+            .put("quality", r.quality?.let { numD(it) } ?: NULL)
 
         if (enabled) Log.i(LIVE_TAG, j.toString())
         lines++

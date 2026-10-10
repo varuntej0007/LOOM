@@ -43,6 +43,7 @@ sealed class Screen {
     data class Inspect(val id: String) : Screen()
     data class Detail(val id: String) : Screen()
     data class Run(val id: String, val profile: Boolean) : Screen()
+    data object Settings : Screen()
 }
 
 /** Single activity. Screens are Compose; long work lives in [RunService] + [StudioRuntime]. */
@@ -66,6 +67,16 @@ class MainActivity : ComponentActivity() {
     private val pickModel =
         registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
             if (uri != null) importModel(uri)
+        }
+
+    private val pickProject =
+        registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
+            if (uri != null) importProject(uri)
+        }
+
+    private val pickPolicy =
+        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+            if (uri != null) message = runtime.importPolicy(uri)
         }
 
     private val runtime get() = StudioApp.instance.runtime
@@ -94,6 +105,8 @@ class MainActivity : ComponentActivity() {
                             message = message,
                             onDismissMessage = { message = null },
                             onImportModel = { pickModel.launch(arrayOf("*/*")) },
+                            onImportProject = { pickProject.launch(null) },
+                            onSettings = { screen = Screen.Settings },
                             onOpen = { c -> screen = Screen.Detail(c.id) },
                             onStartService = { RunService.start(this@MainActivity) },
                             onStopService = { RunService.stop(this@MainActivity) },
@@ -119,12 +132,23 @@ class MainActivity : ComponentActivity() {
                                 onRun = { requestRun(Screen.Run(card.id, profile = false)) },
                                 onProfile = { requestRun(Screen.Run(card.id, profile = true)) },
                                 onInspect = { screen = Screen.Inspect(card.id) },
+                                policySource = runtime.policy(card.id)?.sourceLabel,
+                                lastCompare = runtime.lastCompare(card),
                             )
                         }
+                        Screen.Settings -> com.loom.studio.ui.SettingsScreen(onBack = { screen = Screen.Library })
                         is Screen.Run -> {
                             val a = active
                             if (a != null && a.card.id == s.id) {
-                                RunScreen(a, s.profile, onBack = { leaveRun(s.id) })
+                                RunScreen(a, s.profile, onBack = { leaveRun(s.id) },
+                                    onImportPolicy = { pickPolicy.launch(arrayOf("application/json", "*/*")) })
+                                message?.let { m ->
+                                    androidx.compose.material3.AlertDialog(
+                                        onDismissRequest = { message = null },
+                                        confirmButton = { androidx.compose.material3.TextButton(onClick = { message = null }) { androidx.compose.material3.Text("OK") } },
+                                        text = { androidx.compose.material3.Text(m) },
+                                    )
+                                }
                             }
                         }
                     }
@@ -134,7 +158,7 @@ class MainActivity : ComponentActivity() {
                 BackHandler(enabled = screen != Screen.Library) {
                     when (val s = screen) {
                         is Screen.Run -> leaveRun(s.id)
-                        is Screen.Detail, is Screen.Inspect -> screen = Screen.Library
+                        is Screen.Detail, is Screen.Inspect, Screen.Settings -> screen = Screen.Library
                         Screen.Library -> Unit
                     }
                 }
@@ -147,6 +171,18 @@ class MainActivity : ComponentActivity() {
         message = null
         lifecycleScope.launch {
             when (val r = runtime.import(uri) { p -> runOnUiThread { importProgress = p } }) {
+                is ImportManager.Result.Ok -> screen = Screen.Inspect(r.card.id)
+                is ImportManager.Result.Failed -> message = r.message
+            }
+            importProgress = null
+        }
+    }
+
+    private fun importProject(uri: Uri) {
+        importProgress = 0f
+        message = null
+        lifecycleScope.launch {
+            when (val r = runtime.importProject(uri) { p -> runOnUiThread { importProgress = p } }) {
                 is ImportManager.Result.Ok -> screen = Screen.Inspect(r.card.id)
                 is ImportManager.Result.Failed -> message = r.message
             }

@@ -63,6 +63,8 @@ fun LibraryScreen(
     message: String?,
     onDismissMessage: () -> Unit,
     onImportModel: () -> Unit,
+    onImportProject: () -> Unit,
+    onSettings: () -> Unit,
     onOpen: (ModelCard) -> Unit,
     onStartService: () -> Unit,
     onStopService: () -> Unit,
@@ -94,7 +96,7 @@ fun LibraryScreen(
                     )
                     DropdownMenuItem(
                         text = { Text("Import LOOM project (loom.json)") },
-                        onClick = { menuOpen = false; soon("LOOM projects (loom.json) arrive in drop 3") },
+                        onClick = { menuOpen = false; onImportProject() },
                     )
                 }
             }
@@ -109,7 +111,7 @@ fun LibraryScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            item { Header() }
+            item { Header(onSettings) }
             item {
                 LoomPill(
                     live = live,
@@ -145,6 +147,7 @@ fun LibraryScreen(
 @Composable
 private fun ModelRow(card: ModelCard, onClick: () -> Unit) {
     val profiled = remember(card.id) { StudioApp.instance.runtime.profiles(card.id) }
+    val compared = remember(card.id) { StudioApp.instance.runtime.lastCompare(card) }
     Row(
         Modifier
             .fillMaxWidth()
@@ -176,7 +179,8 @@ private fun ModelRow(card: ModelCard, onClick: () -> Unit) {
             Text("${card.kindLabel} · .${card.format} · ${card.sizeText}", color = Loom.Muted, fontSize = 12.sp)
             Text(
                 when {
-                    !card.runnable -> "runtime arrives in a later drop"
+                    !card.runnable -> "no runtime for this file type"
+                    compared != null -> compared
                     profiled != null -> "profiled on this phone · ${profiled.rows.size} profiles"
                     else -> "not profiled yet"
                 },
@@ -188,12 +192,13 @@ private fun ModelRow(card: ModelCard, onClick: () -> Unit) {
 }
 
 @Composable
-private fun Header() {
+private fun Header(onSettings: () -> Unit) {
     Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
             InfinityMark(progress = 1f, pulse = 0f, modifier = Modifier.size(width = 46.dp, height = 24.dp))
             Spacer(Modifier.width(10.dp))
-            Text("LOOM Studio", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Loom.Ink)
+            Text("LOOM Studio", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Loom.Ink, modifier = Modifier.weight(1f))
+            Text("⚙", fontSize = 24.sp, color = Loom.Muted, modifier = Modifier.clickable(onClick = onSettings).padding(8.dp))
         }
         Spacer(Modifier.height(4.dp))
         Text(

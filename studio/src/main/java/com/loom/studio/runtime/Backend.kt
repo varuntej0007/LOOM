@@ -9,6 +9,7 @@ data class GenParams(
     val temperature: Float = 0.7f,
     val topK: Int = 40,
     val tokenRateCap: Double? = null,
+    val seed: Int = 7,
 )
 
 /** A runtime that can load an imported model with a set of knobs (one chiplet profile). */

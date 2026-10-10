@@ -119,6 +119,9 @@ class Preprocess(card: ModelCard) : FixedChiplet("Preprocess", "preprocess", "ro
         return input
     }
 
+    /** The current upright frame (valid until the next frame; pipeline thread only). */
+    fun lastFrame(): Bitmap? = upright ?: raw
+
     /** Copy of the current upright frame (the profiler keeps a few as its fixed workload). */
     fun snapshot(): Bitmap? = (upright ?: raw)?.let { it.copy(Bitmap.Config.ARGB_8888, false) }
 

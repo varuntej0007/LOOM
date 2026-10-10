@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,6 +27,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,13 +54,16 @@ import kotlin.math.max
  * Vision: camera preview + overlay. Generic: live numbers. [profile] = run the profiler.
  */
 @Composable
-fun RunScreen(active: StudioRuntime.Active, profile: Boolean, onBack: () -> Unit) {
+fun RunScreen(active: StudioRuntime.Active, profile: Boolean, onBack: () -> Unit, onImportPolicy: () -> Unit) {
     val rt = StudioApp.instance.runtime
     val pipeline = active.pipeline
     val w by active.weaver.state.collectAsState()
     val result by pipeline.last.collectAsState()
-    val profiler by rt.profiler.collectAsState()
-    val pstate = profiler?.state?.collectAsState()?.value
+    val profFlow by rt.profilerState.collectAsState()
+    val pstate = profFlow?.collectAsState()?.value
+    val compareRunner by rt.compare.collectAsState()
+    val cstate = compareRunner?.state?.collectAsState()?.value
+    var toast by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
     val activity = LocalContext.current as? Activity
 
     // Keep the screen on while a model runs; the Display chiplet sets real screen brightness.
@@ -77,7 +82,7 @@ fun RunScreen(active: StudioRuntime.Active, profile: Boolean, onBack: () -> Unit
     }
     if (profile) {
         LaunchedEffect(active) {
-            while (!pipeline.inference.isReady) delay(200)
+            while (!pipeline.ready) delay(200)
             delay(1500)
             rt.startProfiling()
         }
@@ -86,28 +91,57 @@ fun RunScreen(active: StudioRuntime.Active, profile: Boolean, onBack: () -> Unit
     val chips = pipeline.chiplets.filter { it.adaptive }.map { c -> Triple(c.key, c.name, c.profiles.map { it.level }) }
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         val vp = pipeline as? VisionPipeline
-        if (vp != null) {
-            CameraHost(vp, Modifier.fillMaxSize())
-            val disp by vp.display.result.collectAsState()
-            Overlay(disp, vp.display.frameW, vp.display.frameH, Modifier.fillMaxSize())
-        } else {
-            GenericPanel(result, Modifier.fillMaxSize().statusBarsPadding().padding(top = 140.dp, start = 16.dp, end = 16.dp))
+        val lp = pipeline as? com.loom.studio.pipeline.LlmPipeline
+        when {
+            vp != null -> {
+                CameraHost(vp, Modifier.fillMaxSize())
+                val disp by vp.display.result.collectAsState()
+                Overlay(disp, vp.display.frameW, vp.display.frameH, Modifier.fillMaxSize())
+            }
+            lp != null -> ChatBody(lp, Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()
+                .padding(top = 150.dp, start = 12.dp, end = 12.dp, bottom = 8.dp))
+            else -> GenericPanel(result, Modifier.fillMaxSize().statusBarsPadding().padding(top = 150.dp, start = 16.dp, end = 16.dp))
         }
         Column(Modifier.fillMaxWidth().statusBarsPadding().padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("‹", color = Color.White, fontSize = 32.sp, modifier = Modifier.clickable(onClick = onBack).padding(end = 12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(active.card.displayName, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1)
-                    Text("${active.card.kindLabel} · ${pipeline.inference.profileLabel}", color = Color(0xFFB6C2D6), fontSize = 12.sp)
+                    Text("${active.card.kindLabel} · ${pipeline.main.profileLabel} · policy: ${w.policySource}", color = Color(0xFFB6C2D6), fontSize = 12.sp, maxLines = 1)
                 }
             }
             Spacer(Modifier.height(8.dp))
-            WeaverPill(w, pipeline.unitName.let { if (it == "frames") "fps" else "runs" }, chips,
-                onMode = active.weaver::setMode, onManual = active.weaver::manual)
+            WeaverPill(w, pipeline.unitShort, chips,
+                onMode = active.weaver::setMode, onManual = active.weaver::manual,
+                extra = {
+                    Text(w.planText?.let { "Plan: $it" } ?: "No plan yet — profile, then Plan", color = Color(0xFFB6C2D6), fontSize = 11.sp)
+                    androidx.compose.foundation.layout.Spacer(Modifier.height(6.dp))
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        ChipRow(listOf("Profile", "Plan (exact)", "Export for QAOA", "Import policy", "Compare 15 min", "Compare 2 min"), -1) { i ->
+                            when (i) {
+                                0 -> rt.startProfiling()
+                                1 -> toast = rt.planExact()
+                                2 -> toast = rt.exportForQuantum()
+                                3 -> onImportPolicy()
+                                4 -> rt.startCompare(15)
+                                5 -> rt.startCompare(2)
+                            }
+                        }
+                    }
+                })
+            toast?.let { t ->
+                Spacer(Modifier.height(6.dp))
+                Text(t, color = Color.White, fontSize = 12.sp, modifier = Modifier.clip(RoundedCornerShape(10.dp))
+                    .background(Color(0xE61A5CFF)).clickable { toast = null }.padding(10.dp))
+            }
         }
         Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding().padding(12.dp)) {
             if (pstate != null && (pstate.running || pstate.result != null || pstate.error != null)) {
                 ProfilerCard(pstate)
+                Spacer(Modifier.height(8.dp))
+            }
+            if (cstate != null) {
+                CompareCard(cstate, onCancel = rt::cancelCompare, onExport = { toast = rt.exportCompare() })
                 Spacer(Modifier.height(8.dp))
             }
             result?.let { r -> if (r.labels.isNotEmpty() && vp != null) ResultStrip(r) }
@@ -140,6 +174,27 @@ private fun ProfilerCard(p: com.loom.studio.profiler.ProfilerState) {
                     color = Color.White, fontFamily = FontFamily.Monospace, fontSize = 11.sp,
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun CompareCard(c: com.loom.studio.CompareRunner.State, onCancel: () -> Unit, onExport: () -> Unit) {
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xE60B1220)).padding(14.dp)) {
+        Text("Compare · ${c.phase.name}" + if (c.secondsLeft > 0) " · ${c.secondsLeft / 60}:${"%02d".format(c.secondsLeft % 60)} left" else "",
+            color = Color.White, fontWeight = FontWeight.Bold)
+        Text(c.note, color = Color(0xFFB6C2D6), fontSize = 12.sp)
+        fun line(s: com.loom.studio.CompareRunner.Summary?) = s?.let {
+            String.format(Locale.US, "%-8s %s · heat avg %.2f max %.2f · %s · %.1f/s · goal %.0f%% · q %s",
+                it.phase, it.avgMa?.let { m -> String.format(Locale.US, "%.0f mA", m) } ?: "— mA", it.avgHeat, it.maxHeat, it.maxThermal,
+                it.avgMetric, it.goalMetPct, it.avgQuality?.let { q -> String.format(Locale.US, "%.2f", q) } ?: "—")
+        }
+        line(c.fixed)?.let { Text(it, color = Color.White, fontFamily = FontFamily.Monospace, fontSize = 11.sp) }
+        line(c.adaptive)?.let { Text(it, color = Color.White, fontFamily = FontFamily.Monospace, fontSize = 11.sp) }
+        Spacer(Modifier.height(6.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (c.phase == com.loom.studio.CompareRunner.Phase.DONE) ChipRow(listOf("Save to Download/LOOM"), -1) { onExport() }
+            else if (c.phase != com.loom.studio.CompareRunner.Phase.CANCELLED) ChipRow(listOf("Cancel"), -1) { onCancel() }
         }
     }
 }

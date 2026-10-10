@@ -4,9 +4,10 @@ import android.graphics.Bitmap
 import com.loom.studio.chiplets.UnitResult
 import com.loom.studio.core.Level
 import com.loom.studio.pipeline.GenericPipeline
-import com.loom.studio.pipeline.Pipeline
+import com.loom.studio.chiplets.InferenceChiplet
+import com.loom.studio.chiplets.Profile
+import com.loom.studio.pipeline.TensorPipeline
 import com.loom.studio.pipeline.VisionPipeline
-import com.loom.studio.runtime.LiteRtSession
 import com.loom.studio.telemetry.DeviceSignals
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,7 +35,7 @@ data class ProfilerState(
  * Battery current is only honest on battery power; charging is detected and flagged.
  */
 class Profiler(
-    private val pipeline: Pipeline,
+    private val pipeline: TensorPipeline,
     private val modelFile: File,
     private val signals: () -> DeviceSignals?,
     private val deviceName: String,
@@ -86,14 +87,18 @@ class Profiler(
             charging = signals()?.charging == true
 
             // ---- 2. inference profiles ----
-            val infProfiles = pipeline.inference.profiles
+            val base = pipeline.inference.profiles
+            val extras = if (pipeline.card.runFormat == "tflite" && !base.any { it.label.startsWith("NPU") })
+                InferenceChiplet.liteRtExtraProfiles() else emptyList()
+            val infProfiles: List<Profile> = base + extras.filter { e -> base.none { it.label == e.label } }
+            val backend = InferenceChiplet.backendFor(pipeline.card)
             var reference: List<UnitResult>? = null
             val share = 0.6f / infProfiles.size
             for ((pi, p) in infProfiles.withIndex()) {
                 val base = 0.16f + pi * share
                 step(base, "Inference ${p.label}: building")
                 val session = try {
-                    LiteRtSession.create(modelFile, p.knobs)
+                    backend.load(pipeline.card, pipeline.inference.fileFor(p), p.knobs)
                 } catch (t: Throwable) {
                     rows += MeasuredProfile("inference", p.label, p.level.name, null, null, null, null, null, null, "failed: ${t.message}")
                     step(base + share, "Inference ${p.label}: failed (${t.message})")
@@ -172,11 +177,12 @@ class Profiler(
                 rows += MeasuredProfile("display", p.label, p.level.name, null, null, null, null, null, null, "not measured: screen brightness lever")
             }
 
-            val table = ProfileTable(pipeline.card.id, pipeline.card.displayName, deviceName, System.currentTimeMillis(), charging, idle, rows)
-            table.save(outFile)
             if (!charging) {
-                pipeline.inference.reorder(rows.filter { it.chiplet == "inference" && it.ma != null }.associate { it.label to it.ma!! })
+                pipeline.inference.reorder(infProfiles.mapNotNull { p -> rows.firstOrNull { it.chiplet == "inference" && it.label == p.label }?.let { p to it } })
             }
+            val table = ProfileTable(pipeline.card.id, pipeline.card.displayName, deviceName, System.currentTimeMillis(), charging, idle, rows,
+                pipeline.inference.profiles.map { it.label })
+            table.save(outFile)
             pipeline.inference.measuredQuality = rows.filter { it.chiplet == "inference" && it.quality != null }.associate { it.label to it.quality!! }
             _state.value = _state.value.copy(running = false, progress = 1f, step = if (charging)
                 "Done — but the phone was charging: mA values are not workload power. Unplug and re-profile." else "Done", result = table)

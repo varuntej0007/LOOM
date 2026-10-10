@@ -4,6 +4,7 @@ brute force, and write the policy table the Weaver loads at startup.
 
     python quantum/solve_policy.py            # full run (15 problems)
     python quantum/solve_policy.py --quick    # p=3, fewer restarts
+    python quantum/solve_policy.py --profiles studio_export.json   # one LOOM Studio model (Plan B)
 
 Pipeline per problem
   1. loom_qubo.build()        constrained model  ->  QUBO (one-hot + budget penalties, slack qubits)
@@ -351,6 +352,7 @@ def plot_case(r: dict, m: dict, path: str):
 def solve_job(maxiter, m, g, b, reps, restarts, shots, seed):
     global MAXITER
     MAXITER = maxiter                                   # set inside the worker process
+    L.configure(m)                                      # chiplet list of THIS model (spawned workers)
     return solve(m, g, b, reps, restarts, shots, seed)
 
 
@@ -361,13 +363,19 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--quick", action="store_true")
     ap.add_argument("--seed", type=int, default=7)
+    ap.add_argument("--profiles", help="LOOM Studio export (studio_export.json): solve that model's chiplets")
+    ap.add_argument("--out", help="policy output path (default: quantum/results/studio_policy.json with --profiles)")
     args = ap.parse_args()
     global MAXITER, MAXITER_RUN
     reps, restarts, shots = (3, 2, 2048) if args.quick else (5, 3, 4096)
     MAXITER = MAXITER_RUN = 300 if args.quick else 800
 
-    m = L.load_model()
+    m = L.load_model(args.profiles)
+    studio = bool(m.get("studio"))
+    policy_path = args.out or (os.path.join(OUT, "studio_policy.json") if studio else POLICY)
     os.makedirs(OUT, exist_ok=True)
+    if studio:
+        print(f"LOOM Studio model: {m.get('model')} · chiplets {', '.join(L.CHIPLETS)} · throughput {', '.join(L.THROUGHPUT)}")
     print(f"Qiskit {QISKIT_VERSION} · QAOA p={reps} · {shots} shots per problem\n")
     jobs = [(MAXITER_RUN, m, g, b, reps, restarts, shots, args.seed)
             for b in m["heat_buckets"] for g in m["goals_fps"]]
@@ -389,12 +397,13 @@ def main():
     stamp = dt.datetime.now().astimezone().isoformat(timespec="seconds")
 
     # Charts for the two most instructive cases.
-    for r in results:
-        if (r["goal"], r["bucket"]) in ((15, "cool"), (15, "mild")):
-            plot_case(r, m, os.path.join(OUT, f"qaoa_goal{int(r['goal'])}_{r['bucket']}.png"))
+    if not studio:
+        for r in results:
+            if (r["goal"], r["bucket"]) in ((15, "cool"), (15, "mild")):
+                plot_case(r, m, os.path.join(OUT, f"qaoa_goal{int(r['goal'])}_{r['bucket']}.png"))
 
     clean = [{k: v for k, v in r.items() if not k.startswith("_")} for r in results]
-    with open(os.path.join(OUT, "report.json"), "w", encoding="utf-8") as f:
+    with open(os.path.join(OUT, "studio_report.json" if studio else "report.json"), "w", encoding="utf-8") as f:
         json.dump({"generated": stamp, "qiskit": QISKIT_VERSION, "all_match_brute_force": ok,
                    "model": m, "problems": clean}, f, indent=2, ensure_ascii=False)
 
@@ -415,14 +424,17 @@ def main():
             "p_optimal": r["qaoa"]["p_optimal"],
         } for r in results],
     }
-    os.makedirs(os.path.dirname(POLICY), exist_ok=True)
-    with open(POLICY, "w", encoding="utf-8") as f:
+    os.makedirs(os.path.dirname(os.path.abspath(policy_path)), exist_ok=True)
+    with open(policy_path, "w", encoding="utf-8") as f:
         json.dump(policy, f, indent=2, ensure_ascii=False)
 
-    write_markdown(clean, m, ok, stamp, reps, shots)
+    if not studio:
+        write_markdown(clean, m, ok, stamp, reps, shots)
     print(f"\n{'All' if ok else 'NOT all'} {len(results)} QAOA answers match brute force.")
-    print(f"Policy table  -> {os.path.relpath(POLICY, ROOT)}")
-    print(f"Report        -> {os.path.relpath(os.path.join(OUT, 'report.md'), ROOT)}")
+    print(f"Policy table  -> {os.path.relpath(policy_path, ROOT)}")
+    if studio:
+        print("Import it in LOOM Studio: Run → LOOM panel → Import policy  (or adb push it to the phone's Download folder)")
+    print(f"Report        -> {os.path.relpath(os.path.join(OUT, 'studio_report.json' if studio else 'report.md'), ROOT)}")
     return 0 if ok else 1
 
 

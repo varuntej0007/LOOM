@@ -34,9 +34,37 @@ ALLOWED = {
 }
 
 
+# Chiplets whose level caps the unit rate (FPS / tokens/s). app/: detector and camera.
+THROUGHPUT = ["Inference", "Capture"]
+
+
 def load_model(path: str | None = None) -> dict:
     with open(path or os.path.join(HERE, "loom_model.json"), encoding="utf-8") as f:
-        return json.load(f)
+        m = json.load(f)
+    configure(m)
+    return m
+
+
+def configure(m: dict) -> None:
+    """Set the chiplet list from the model. A LOOM Studio export ("studio": 1) brings its own
+    chiplets, levels and throughput chiplets; app/'s model keeps the original fixed setup.
+    Call again inside worker processes (Windows spawns fresh interpreters)."""
+    global CHIPLETS, ALLOWED, THROUGHPUT
+    if not m.get("studio"):
+        CHIPLETS = ["Display", "Inference", "Capture", "Narrator"]
+        ALLOWED = {"Display": ["HIGH", "BALANCED", "ECO"], "Inference": ["HIGH", "BALANCED", "ECO"],
+                   "Capture": ["HIGH", "BALANCED", "ECO"], "Narrator": ["HIGH", "BALANCED"]}
+        THROUGHPUT = ["Inference", "Capture"]
+        return
+    CHIPLETS = list(m["chiplets"].keys())
+    ALLOWED = {c: [lv for lv in LEVELS if lv in m["chiplets"][c]["levels"]] for c in CHIPLETS}
+    THROUGHPUT = [c for c in m.get("roles", {}).get("throughput", []) if c in CHIPLETS][:2]
+
+
+def _rate(m: dict, c: str, lv: str) -> float:
+    lvl = m["chiplets"][c]["levels"][lv]
+    v = lvl.get("max_fps", lvl.get("camera_fps"))
+    return float("inf") if v is None else float(v)
 
 
 def var(ch: str, lv: str) -> str:
@@ -49,15 +77,40 @@ def power_mA(m: dict, cfg: dict) -> float:
 
 
 def fps(m: dict, cfg: dict) -> float:
-    inf = m["chiplets"]["Inference"]["levels"][cfg["Inference"]]["max_fps"]
-    cam = m["chiplets"]["Capture"]["levels"][cfg["Capture"]]["camera_fps"]
-    return min(inf, cam)
+    r = min((_rate(m, c, cfg[c]) for c in THROUGHPUT), default=float("inf"))
+    return 0.0 if r == float("inf") else r
+
+
+def _pair_penalty(m: dict, levels: dict, goal: float) -> float:
+    """Shortfall for the throughput chiplets' levels (dict chiplet -> level)."""
+    f = min((_rate(m, c, lv) for c, lv in levels.items()), default=float("inf"))
+    if f == float("inf"):
+        return 0.0
+    return m["fps_shortfall_penalty_per_fps"] * max(0.0, goal - f)
 
 
 def shortfall_penalty(m: dict, inf_lv: str, cap_lv: str, goal: float) -> float:
-    f = min(m["chiplets"]["Inference"]["levels"][inf_lv]["max_fps"],
-            m["chiplets"]["Capture"]["levels"][cap_lv]["camera_fps"])
-    return m["fps_shortfall_penalty_per_fps"] * max(0.0, goal - f)
+    """app/ signature (detector level, camera level)."""
+    return _pair_penalty(m, dict(zip(THROUGHPUT, (inf_lv, cap_lv))), goal)
+
+
+def shortfall_terms(m: dict, goal: float):
+    """QUBO terms of the shortfall: quadratic for two throughput chiplets, linear for one."""
+    lin, quad = {}, {}
+    if len(THROUGHPUT) == 2:
+        a, b = THROUGHPUT
+        for la in ALLOWED[a]:
+            for lb in ALLOWED[b]:
+                pen = _pair_penalty(m, {a: la, b: lb}, goal)
+                if pen > 0:
+                    quad[(var(a, la), var(b, lb))] = round(pen, 3)
+    elif len(THROUGHPUT) == 1:
+        a = THROUGHPUT[0]
+        for la in ALLOWED[a]:
+            pen = _pair_penalty(m, {a: la}, goal)
+            if pen > 0:
+                lin[var(a, la)] = round(pen, 3)
+    return lin, quad
 
 
 def quality_loss(m: dict, cfg: dict) -> float:
@@ -65,7 +118,7 @@ def quality_loss(m: dict, cfg: dict) -> float:
 
 
 def objective(m: dict, cfg: dict, goal: float) -> float:
-    return quality_loss(m, cfg) + shortfall_penalty(m, cfg["Inference"], cfg["Capture"], goal)
+    return quality_loss(m, cfg) + _pair_penalty(m, {c: cfg[c] for c in THROUGHPUT}, goal)
 
 
 def predicted_heat(m: dict, h_now: float, p_mA: float) -> float:
@@ -126,11 +179,10 @@ def build(m: dict, goal: float, h_now: float) -> Problem:
             if q:
                 linear[var(c, lv)] = float(q)
     # FPS depends on the PAIR (detector, camera rate): a quadratic term.
-    for il in ALLOWED["Inference"]:
-        for cl in ALLOWED["Capture"]:
-            pen = shortfall_penalty(m, il, cl, goal)
-            if pen > 0:
-                quadratic[(var("Inference", il), var("Capture", cl))] = round(pen, 3)
+    sl, sq = shortfall_terms(m, goal)
+    for k, v in sl.items():
+        linear[k] = linear.get(k, 0.0) + v
+    quadratic.update(sq)
     qp.minimize(linear=linear, quadratic=quadratic)
 
     for c in CHIPLETS:
@@ -203,11 +255,10 @@ def build_priced(m: dict, goal: float, price: float):
             v = lvl["quality_loss"] + price * lvl["power_mA"] / unit
             if v:
                 linear[var(c, lv)] = float(v)
-    for il in ALLOWED["Inference"]:
-        for cl in ALLOWED["Capture"]:
-            pen = shortfall_penalty(m, il, cl, goal)
-            if pen > 0:
-                quadratic[(var("Inference", il), var("Capture", cl))] = round(pen, 3)
+    sl, sq = shortfall_terms(m, goal)
+    for k, v in sl.items():
+        linear[k] = linear.get(k, 0.0) + v
+    quadratic.update(sq)
     qp.minimize(linear=linear, quadratic=quadratic)
     for c in CHIPLETS:
         qp.linear_constraint({var(c, lv): 1 for lv in ALLOWED[c]}, "==", 1, name=f"one_{c}")

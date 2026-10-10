@@ -40,6 +40,7 @@ class RunService : Service() {
     private var signals: DeviceSignals? = null
     private var loop: ScheduledExecutorService? = null
     private var wakeLock: PowerManager.WakeLock? = null
+    private var wifiLock: android.net.wifi.WifiManager.WifiLock? = null
     private var ticks = 0L
     private var control: BroadcastReceiver? = null
 
@@ -90,6 +91,19 @@ class RunService : Service() {
                 acquire(WAKE_LOCK_MAX_MS)
             }
 
+        // Debug builds only: keep the Wi-Fi radio awake with the screen off, so adb over Wi-Fi
+        // (the laptop dashboard) does not drop. Costs a little battery, so never in release.
+        if ((applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0) {
+            try {
+                @Suppress("DEPRECATION")
+                wifiLock = getSystemService(android.net.wifi.WifiManager::class.java)
+                    ?.createWifiLock(android.net.wifi.WifiManager.WIFI_MODE_FULL_HIGH_PERF, "LOOM:studio-adb")
+                    ?.apply { setReferenceCounted(false); acquire() }
+            } catch (t: Throwable) {
+                Log.w(TAG, "wifi lock", t)
+            }
+        }
+
         val s = DeviceSignals(applicationContext).also { it.start() }
         signals = s
         StudioApp.instance.runtime.signals = s
@@ -132,6 +146,8 @@ class RunService : Service() {
         signals = null
         wakeLock?.let { if (it.isHeld) it.release() }
         wakeLock = null
+        wifiLock?.let { if (it.isHeld) it.release() }
+        wifiLock = null
         StudioApp.serviceRunningFlow.value = false
         telemetry.event("Studio run service stopped")
         Log.i(TAG, "run service stopped")

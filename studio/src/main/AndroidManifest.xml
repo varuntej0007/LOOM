@@ -19,6 +19,13 @@
     <!-- Keeps the 1 Hz telemetry and the Weaver ticking with the screen off (normal permission). -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
+    <!-- Android 11+ package visibility: bind the phone's text-to-speech engine (Voice chiplet). -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+    </queries>
+
     <application
         android:name=".StudioApp"
         android:allowBackup="false"

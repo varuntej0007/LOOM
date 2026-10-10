@@ -59,6 +59,10 @@ data class ModelCard(
     val ramWarning: String?,
     val importedAt: Long,
     val overridden: Boolean = false,
+    /** For a MediaPipe vision bundle: the extracted main .tflite that LiteRT runs. */
+    val innerFile: String? = null,
+    /** Set when the model came from a loom.json project. */
+    val projectFile: String? = null,
 ) {
     /** "VISION · detector" — the line the M1 done-check looks for. */
     val kindLabel: String
@@ -66,8 +70,15 @@ data class ModelCard(
 
     val sizeText: String get() = formatBytes(sizeBytes)
 
-    /** True when Studio can run it in this build (other runtimes arrive in later drops). */
-    val runnable: Boolean get() = format == "tflite"
+    /** True when Studio has a runtime for it. */
+    val runnable: Boolean get() = format == "tflite" || format == "onnx" || format == "gguf" ||
+        (format == "task" && (kind == TaskKind.LLM || innerFile != null))
+
+    /** The file the tensor runtime should load (inner .tflite for MediaPipe vision bundles). */
+    val runFile: String get() = innerFile ?: fileName
+
+    /** Runtime format for tensor pipelines. */
+    val runFormat: String get() = if (innerFile != null) "tflite" else format
 }
 
 fun formatBytes(b: Long): String = when {

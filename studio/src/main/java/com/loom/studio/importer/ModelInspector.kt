@@ -38,10 +38,38 @@ class ModelInspector(private val context: Context) {
             "task" -> {
                 hint = taskHint(file)
                 labels = readEmbeddedLabels(file)
+                // A non-LLM MediaPipe bundle is a zip of .tflite models: run its main model with LiteRT.
+                val inner = if (Classifier.classify("task", emptyList(), emptyList(), hint).kind == TaskKind.LLM) null else extractMainTflite(file)
+                if (inner != null) {
+                    val io = readTfliteTensors(inner)
+                    inputs = io.first
+                    outputs = io.second
+                    labels = labels ?: readEmbeddedLabels(inner)
+                    notes += "MediaPipe bundle: its main model ${inner.name} runs with LiteRT"
+                    val r = Classifier.classify("tflite", inputs, outputs)
+                    return build(id, displayName, format, file, size, r, inputs, outputs, labels, null, notes, innerFile = inner.name)
+                }
             }
-            "onnx" -> notes += "ONNX tensors are read when the ONNX runtime arrives (drop 3)"
+            "onnx" -> {
+                val io = try {
+                    com.loom.studio.runtime.OnnxBackend.inspect(file)
+                } catch (t: Throwable) {
+                    throw InspectException("ONNX Runtime could not open this model: ${t.message ?: t.javaClass.simpleName}", t)
+                }
+                inputs = io.first
+                outputs = io.second
+                if (inputs.any { it.shape.isEmpty() }) notes += "some input sizes are dynamic; 1 is assumed for unknown dimensions"
+            }
         }
         val r = Classifier.classify(format, inputs, outputs, hint)
+        return build(id, displayName, format, file, size, r, inputs, outputs, labels, llm, notes)
+    }
+
+    private fun build(
+        id: String, displayName: String, format: String, file: File, size: Long, r: Classifier.Result,
+        inputs: List<TensorSpec>, outputs: List<TensorSpec>, labels: List<String>?, llm: LlmInfo?,
+        notes: List<String>, innerFile: String? = null,
+    ): ModelCard {
         val in0 = inputs.firstOrNull()
         val isFloatInput = in0?.dtype == "float32" || in0?.dtype == "float16"
         return ModelCard(
@@ -58,12 +86,27 @@ class ModelInspector(private val context: Context) {
             llm = llm,
             confidence = r.confidence,
             reasons = r.reasons + notes +
-                (if (isFloatInput) listOf("float input: pixels normalised as (x − 127.5) / 127.5 (override in loom.json, M7)") else emptyList()),
+                (if (isFloatInput) listOf("float input: pixels normalised as (x − 127.5) / 127.5 (override in loom.json)") else emptyList()),
             normMean = if (isFloatInput) 127.5f else 0f,
             normStd = if (isFloatInput) 127.5f else 1f,
             ramWarning = ramWarning(r.kind, size),
             importedAt = System.currentTimeMillis(),
+            innerFile = innerFile,
         )
+    }
+
+    /** Largest .tflite inside a MediaPipe bundle, extracted next to it (bounded size). */
+    private fun extractMainTflite(file: File): File? = try {
+        ZipFile(file).use { zip ->
+            val e = zip.entries().toList().filter { !it.isDirectory && it.name.endsWith(".tflite", true) && it.size in 1..(2L shl 30) }
+                .maxByOrNull { it.size } ?: return null
+            val safe = e.name.substringAfterLast('/').replace(Regex("[^A-Za-z0-9._-]"), "_")
+            val out = File(file.parentFile, "inner_$safe")
+            zip.getInputStream(e).use { ins -> out.outputStream().use { ins.copyTo(it) } }
+            out
+        }
+    } catch (_: Throwable) {
+        null
     }
 
     private fun checkMagic(format: String, file: File) {

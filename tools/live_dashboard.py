@@ -181,11 +181,55 @@ current = {"serial": None, "link": None}
 ADB_PORT = 5555
 
 
+# adb's built-in mDNS backend (no Bonjour needed on Windows): lets adb discover phones that use
+# Android 11+ "Wireless debugging" and reconnect to them by itself after Wi-Fi changes.
+os.environ.setdefault("ADB_MDNS_OPENSCREEN", "1")
+os.environ.setdefault("ADB_MDNS_AUTO_CONNECT", "adb-tls-connect")
+ADB_ENV = dict(os.environ)
+
+
+def ensure_mdns(adb):
+    """If an adb server is already running without the built-in mDNS backend, restart it once."""
+    out = _run(adb, "mdns", "check", timeout=6).lower()
+    if "openscreen" not in out:
+        _run(adb, "kill-server", timeout=8)
+        _run(adb, "start-server", timeout=10)
+
+
 def _run(adb, *args, timeout=6):
     try:
-        return subprocess.run([adb, *args], capture_output=True, text=True, timeout=timeout).stdout
+        return subprocess.run([adb, *args], capture_output=True, text=True, timeout=timeout, env=ADB_ENV).stdout
     except subprocess.TimeoutExpired:
         return ""
+
+
+def _is_network(serial):
+    """ip:port or an mDNS name (adb-<serial>-xxxx._adb-tls-connect._tcp) = Wi-Fi, not USB."""
+    return ":" in serial or "._adb-tls-connect" in serial or serial.startswith("adb-")
+
+
+DIAG = os.path.join(ROOT, "live_logs", "wifi_diag.txt")
+
+
+def _diag(lines):
+    """Why Wi-Fi did not connect, written for humans (and for Claude to read)."""
+    try:
+        os.makedirs(os.path.dirname(DIAG), exist_ok=True)
+        with open(DIAG, "w", encoding="utf-8") as f:
+            f.write(time.strftime("%Y-%m-%d %H:%M:%S") + "\n" + "\n".join(lines) + "\n")
+    except OSError:
+        pass
+
+
+def _ping(ip):
+    """One ICMP echo (Windows: -n, others: -c). True if the phone answers at all."""
+    flag = "-n" if os.name == "nt" else "-c"
+    try:
+        r = subprocess.run(["ping", flag, "1", "-w" if os.name == "nt" else "-W", "1000" if os.name == "nt" else "1", ip],
+                           capture_output=True, text=True, timeout=4)
+        return r.returncode == 0 and ("TTL=" in r.stdout.upper() or " 0% packet loss" in r.stdout)
+    except (OSError, subprocess.TimeoutExpired):
+        return False
 
 
 def _listed(adb):
@@ -261,7 +305,7 @@ def _scan_for_phone(adb, want_serial):
     2) any host on this laptop's local /24 networks with adb's port 5555 open."""
     for line in _run(adb, "mdns", "services", timeout=6).splitlines():
         m = re.search(r"(\d+\.\d+\.\d+\.\d+:\d+)", line)
-        if m and "_adb" in line and _try_connect(adb, m.group(1), want_serial):
+        if m and ("_adb-tls-connect" in line or "_adb._tcp" in line) and _try_connect(adb, m.group(1), want_serial):
             return m.group(1)
     mine = _laptop_ips()
     hosts = []
@@ -311,7 +355,7 @@ def pick_device(adb):
     - phone on USB -> network mode is (re)armed and its current Wi-Fi address saved;
     - saved Wi-Fi address not answering -> search the local network for the phone."""
     devs = _listed(adb)
-    usb = [d for d in devs if ":" not in d]
+    usb = [d for d in devs if not _is_network(d)]
     if usb:
         pick_device.unreachable = None
         now = time.time()
@@ -337,6 +381,33 @@ def pick_device(adb):
             pick_device.unreachable = None
             return found, "Wi-Fi"
     pick_device.unreachable = addr
+    now = time.time()
+    if now - getattr(pick_device, "diag_at", 0) > 30:
+        pick_device.diag_at = now
+        lines = [f"laptop IPv4: {', '.join(_laptop_ips()) or 'none'}", f"saved phone address: {addr or 'none'}"]
+        hint = "No saved address: plug in USB once (or run wifi_pair.bat)."
+        if addr:
+            ip, port = addr.split(":")[0], int(addr.split(":")[1])
+            pingable = _ping(ip)
+            port_open = _port_open(ip, port, 1.0)
+            lines += [f"ping {ip}: {'answers' if pingable else 'NO answer'}", f"port {port}: {'open' if port_open else 'closed'}"]
+            same = any(ip.rsplit('.', 1)[0] == mine.rsplit('.', 1)[0] for mine in _laptop_ips())
+            lines.append(f"same /24 subnet as the laptop: {'yes' if same else 'NO'}")
+            if not same:
+                hint = "Phone and laptop are on different networks/subnets. Join the same Wi-Fi (or the laptop's hotspot)."
+            elif not pingable:
+                hint = ("The phone does not answer at all although it is on the same subnet: the router isolates devices "
+                        "(guest / venue / 'AP isolation'). Use the laptop's Mobile hotspot, or your phone's hotspot for the laptop.")
+            elif not port_open:
+                hint = ("The phone answers but adb's port is closed: network debugging was switched off (phone restarted, "
+                        "Wi-Fi reconnected, or the iQOO turned it off when USB was unplugged). Fix once and for all: run "
+                        "wifi_pair.bat (Android 11+ Wireless debugging, survives reconnects). Quick fix: plug USB for 10 s.")
+            else:
+                hint = "Port open but adb could not attach: run 'adb kill-server' and restart the dashboard."
+        mdns = _run(adb, "mdns", "services", timeout=6).strip()
+        lines += ["adb mdns services:", mdns or "(none)", "HINT: " + hint]
+        _diag(lines)
+        pick_device.hint = hint
     return None, None
 
 
@@ -347,9 +418,9 @@ def logcat_loop(adb, rec):
             if not serial:
                 far = getattr(pick_device, "unreachable", None)
                 if far:
-                    set_status(False, f"Phone not found on Wi-Fi (last at {far}). Still searching… "
-                                      "Check: phone Wi-Fi on and on the SAME network as the laptop. "
-                                      "Quick fix: plug in USB for 10 s, then unplug.")
+                    set_status(False, f"Phone not found on Wi-Fi (last at {far}). " +
+                               getattr(pick_device, "hint", "Check: same network? Quick fix: plug in USB for 10 s.") +
+                               " Details: live_logs/wifi_diag.txt")
                 else:
                     hint = " or run wifi_connect.bat once" if not os.path.isfile(WIFI_FILE) else \
                         " (Wi-Fi: same network? phone Wi-Fi on?)"
@@ -361,7 +432,7 @@ def logcat_loop(adb, rec):
             proc = subprocess.Popen(
                 [adb, "-s", serial, "logcat", "-v", "tag", "-T", "1", "LOOM_LIVE:I", "LOOM_EVT:I", "LOOM_TRX:I", "*:S"],
                 stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, encoding="utf-8",
-                errors="replace", bufsize=1,
+                errors="replace", bufsize=1, env=ADB_ENV,
             )
             live_note = f"Live from the phone ({link})"
             for line in proc.stdout:
@@ -518,6 +589,7 @@ def main():
         if not adb:
             set_status(False, "adb not found — install Android SDK platform-tools")
         else:
+            ensure_mdns(adb)
             threading.Thread(target=logcat_loop, args=(adb, rec), daemon=True).start()
             threading.Thread(target=temp_loop, args=(adb,), daemon=True).start()
 
