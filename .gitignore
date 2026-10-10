@@ -27,3 +27,8 @@ node_modules/
 
 # LOOM Studio (Plan B) build output
 /studio/build/
+
+# LOOM Studio local build output
+/loom_studio_logs/
+/LOOM_Studio-debug.apk
+/loom_repo.bundle
