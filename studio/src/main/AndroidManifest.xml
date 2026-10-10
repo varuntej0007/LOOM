@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- LOOM Studio is fully on-device. Strip network access even if a library declares it,
+         so "offline" is enforced by the manifest, not by convention. Telemetry leaves the
+         phone only through logcat over the USB / adb debug link. -->
+    <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" tools:node="remove" />
+
+    <!-- Long runs live in a foreground service so Android does not kill them. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Keeps the 1 Hz telemetry and the Weaver ticking with the screen off (normal permission). -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <application
+        android:name=".StudioApp"
+        android:allowBackup="false"
+        android:label="@string/app_name"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:theme="@style/Theme.LoomStudio">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:screenOrientation="portrait"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- specialUse: on-device AI inference host. Later milestones add the "camera" and
+             "microphone" types for vision and audio runs, while those runs are active. -->
+        <service
+            android:name=".service.RunService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="On-device AI model host: runs user-imported models locally and adapts them to device heat and battery" />
+        </service>
+    </application>
+</manifest>

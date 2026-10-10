@@ -24,3 +24,6 @@ __pycache__/
 # Kotlin compiler cache and npm packages
 .kotlin/
 node_modules/
+
+# LOOM Studio (Plan B) build output
+/studio/build/

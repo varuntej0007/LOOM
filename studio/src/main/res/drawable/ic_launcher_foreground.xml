@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- LOOM infinity mark (the "oo" of L∞M). Inside the 66 dp adaptive-icon safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- soft glow -->
+    <path android:pathData="M54.00,54.00 C59.44,46.58 64.88,41.00 71.23,41.00 C78.48,41.00 83.00,47.03 83.00,54.00 C83.00,60.97 78.48,67.00 71.23,67.00 C64.88,67.00 59.44,61.42 54.00,54.00 C48.56,46.58 43.12,41.00 36.77,41.00 C29.52,41.00 25.00,47.03 25.00,54.00 C25.00,60.97 29.52,67.00 36.77,67.00 C43.12,67.00 48.56,61.42 54.00,54.00"
+        android:strokeColor="#2E1E6BFF" android:strokeWidth="15"
+        android:strokeLineCap="round" android:strokeLineJoin="round" />
+    <path android:pathData="M54.00,54.00 C59.44,46.58 64.88,41.00 71.23,41.00 C78.48,41.00 83.00,47.03 83.00,54.00 C83.00,60.97 78.48,67.00 71.23,67.00 C64.88,67.00 59.44,61.42 54.00,54.00 C48.56,46.58 43.12,41.00 36.77,41.00 C29.52,41.00 25.00,47.03 25.00,54.00 C25.00,60.97 29.52,67.00 36.77,67.00 C43.12,67.00 48.56,61.42 54.00,54.00"
+        android:strokeColor="#401E6BFF" android:strokeWidth="11"
+        android:strokeLineCap="round" android:strokeLineJoin="round" />
+    <!-- ribbon -->
+    <path android:pathData="M54.00,54.00 C59.44,46.58 64.88,41.00 71.23,41.00 C78.48,41.00 83.00,47.03 83.00,54.00 C83.00,60.97 78.48,67.00 71.23,67.00 C64.88,67.00 59.44,61.42 54.00,54.00 C48.56,46.58 43.12,41.00 36.77,41.00 C29.52,41.00 25.00,47.03 25.00,54.00 C25.00,60.97 29.52,67.00 36.77,67.00 C43.12,67.00 48.56,61.42 54.00,54.00"
+        android:strokeWidth="7.5" android:strokeLineCap="round" android:strokeLineJoin="round">
+        <aapt:attr name="android:strokeColor">
+            <gradient android:type="linear"
+                android:startX="25" android:startY="41" android:endX="83" android:endY="67">
+                <item android:offset="0" android:color="#FF3DD6FF" />
+                <item android:offset="0.5" android:color="#FF1A5CFF" />
+                <item android:offset="1" android:color="#FF17BDF8" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- highlight -->
+    <path android:pathData="M54.00,54.00 C59.44,46.58 64.88,41.00 71.23,41.00 C78.48,41.00 83.00,47.03 83.00,54.00 C83.00,60.97 78.48,67.00 71.23,67.00 C64.88,67.00 59.44,61.42 54.00,54.00 C48.56,46.58 43.12,41.00 36.77,41.00 C29.52,41.00 25.00,47.03 25.00,54.00 C25.00,60.97 29.52,67.00 36.77,67.00 C43.12,67.00 48.56,61.42 54.00,54.00"
+        android:strokeColor="#40FFFFFF" android:strokeWidth="2"
+        android:strokeLineCap="round" android:strokeLineJoin="round" />
+</vector>

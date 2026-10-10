@@ -16,3 +16,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "LOOM"
 include(":app")
+include(":studio")
