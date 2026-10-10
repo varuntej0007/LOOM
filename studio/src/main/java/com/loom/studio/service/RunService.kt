@@ -5,8 +5,10 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.os.IBinder
 import android.os.PowerManager
@@ -17,6 +19,7 @@ import androidx.core.content.ContextCompat
 import com.loom.studio.MainActivity
 import com.loom.studio.R
 import com.loom.studio.StudioApp
+import com.loom.studio.StudioRuntime
 import com.loom.studio.telemetry.DeviceSignals
 import com.loom.studio.telemetry.TelemetryBus
 import java.util.Locale
@@ -38,6 +41,23 @@ class RunService : Service() {
     private var loop: ScheduledExecutorService? = null
     private var wakeLock: PowerManager.WakeLock? = null
     private var ticks = 0L
+    private var control: BroadcastReceiver? = null
+
+    /**
+     * Laptop dashboard control over USB (same commands as app/, Studio's own action):
+     *   adb shell am broadcast -a com.loom.studio.CONTROL -p com.loom.studio --es cmd stress --es value gpu
+     * Only demo settings are reachable; nothing here reads or sends data.
+     */
+    private fun registerControl() {
+        val r = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                val cmd = intent.getStringExtra("cmd") ?: return
+                StudioApp.instance.runtime.control(cmd, intent.getStringExtra("value") ?: "")
+            }
+        }
+        ContextCompat.registerReceiver(this, r, IntentFilter(StudioRuntime.ACTION_CONTROL), ContextCompat.RECEIVER_EXPORTED)
+        control = r
+    }
 
     private val telemetry: TelemetryBus get() = StudioApp.instance.telemetry
 
@@ -72,6 +92,8 @@ class RunService : Service() {
 
         val s = DeviceSignals(applicationContext).also { it.start() }
         signals = s
+        StudioApp.instance.runtime.signals = s
+        registerControl()
         loop = Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "loom-studio-tick") }.also {
             it.scheduleWithFixedDelay(::tick, 1, 1, TimeUnit.SECONDS)
         }
@@ -84,9 +106,9 @@ class RunService : Service() {
     private fun tick() {
         val s = signals ?: return
         try {
-            telemetry.emitLive(s)
+            StudioApp.instance.runtime.tick(s)
         } catch (t: Throwable) {
-            Log.e(TAG, "live emit", t)
+            Log.e(TAG, "tick", t)
         }
         // Refresh the notification text every 5 s (cheap, and readable on the lock screen).
         if (ticks++ % 5 == 0L) {
@@ -103,6 +125,9 @@ class RunService : Service() {
     override fun onDestroy() {
         loop?.shutdownNow()
         loop = null
+        control?.let { try { unregisterReceiver(it) } catch (_: Throwable) { } }
+        control = null
+        StudioApp.instance.runtime.signals = null
         signals?.stop()
         signals = null
         wakeLock?.let { if (it.isHeld) it.release() }

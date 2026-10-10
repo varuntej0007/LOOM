@@ -42,6 +42,21 @@ data class RunContext(
     val p50Ms: Double = 0.0,
     val p90Ms: Double = 0.0,
     val chiplets: List<ChipletLive> = emptyList(),
+    // --- pipeline counters (same meaning as app/) ---
+    val fps: Double = 0.0,
+    val cameraFps: Double = 0.0,
+    val cameraRate: Int = 0,
+    val frameCap: Int = 0,
+    val notCaptured: Long = 0,
+    val capacityFps: Double = 0.0,
+    val pacing: Boolean = false,
+    val received: Long = 0,
+    val skipped: Long = 0,
+    val paced: Long = 0,
+    val detections: Int = 0,
+    val conf: Double = 0.0,
+    val stress: String = "OFF",
+    val adpf: Boolean = false,
 )
 
 /** What the in-app LOOM pill shows; the same numbers that go out on LOOM_LIVE. */
@@ -105,13 +120,13 @@ class TelemetryBus(private val appContext: Context) {
             .put("device", deviceName)
             .put("frame", r.units)
             .put("mode", r.mode.name)
-            .put("stress", "OFF")
-            .put("fps", if (r.goalMetric == METRIC_FPS) numD(metric ?: 0.0) else 0.0)
-            .put("camera_fps", 0.0)
-            .put("camera_rate", 0)
-            .put("frame_cap", 0)
-            .put("not_captured", 0)
-            .put("capacity_fps", 0.0)
+            .put("stress", r.stress)
+            .put("fps", numD(r.fps))
+            .put("camera_fps", numD(r.cameraFps))
+            .put("camera_rate", r.cameraRate)
+            .put("frame_cap", r.frameCap)
+            .put("not_captured", r.notCaptured)
+            .put("capacity_fps", numD(r.capacityFps))
             .put("goal", goal)
             .put("user_goal", goal)
             .put("effective_goal", goal)
@@ -125,15 +140,15 @@ class TelemetryBus(private val appContext: Context) {
             .put("battery_pct", signals.batteryPct)
             .put("charging", signals.charging)
             .put("airplane", signals.airplaneMode)
-            .put("pacing", false)
+            .put("pacing", r.pacing)
             .put("processed", r.units)
-            .put("received", r.units)
-            .put("skipped", 0)
-            .put("paced", 0)
+            .put("received", r.received)
+            .put("skipped", r.skipped)
+            .put("paced", r.paced)
             .put("p50_ms", numD(r.p50Ms))
             .put("p90_ms", numD(r.p90Ms))
-            .put("detections", 0)
-            .put("conf", 0.0)
+            .put("detections", r.detections)
+            .put("conf", numD(r.conf))
             .put("status", r.status)
             .put("policy", r.policySource ?: NULL)
             .put("plan", NULL)
@@ -151,6 +166,7 @@ class TelemetryBus(private val appContext: Context) {
             .put("goal_value", r.goalValue ?: NULL)
             .put("metric_value", metric?.let { numD(it) } ?: NULL)
             .put("units", r.units)
+            .put("adpf", r.adpf)
 
         if (enabled) Log.i(LIVE_TAG, j.toString())
         lines++
@@ -182,7 +198,7 @@ class TelemetryBus(private val appContext: Context) {
         )
     }
 
-    private val deviceName: String by lazy {
+    val deviceName: String by lazy {
         val named: String? = try {
             android.provider.Settings.Global.getString(
                 appContext.contentResolver, android.provider.Settings.Global.DEVICE_NAME

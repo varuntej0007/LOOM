@@ -13,11 +13,14 @@ class StudioApp : Application() {
 
     lateinit var telemetry: TelemetryBus
         private set
+    lateinit var runtime: StudioRuntime
+        private set
 
     override fun onCreate() {
         super.onCreate()
         instance = this
         telemetry = TelemetryBus(this)
+        runtime = StudioRuntime(this, telemetry)
     }
 
     companion object {

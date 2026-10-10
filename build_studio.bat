@@ -35,15 +35,18 @@ goto :git_done
 set "CUR="
 for /f %%B in ('git symbolic-ref --short HEAD 2^>nul') do set "CUR=%%B"
 if not "%CUR%"=="plan-b-studio" goto :git_done
-git fetch -q loom_repo.bundle plan-b-studio 2>nul
-if errorlevel 1 goto :git_done
-git merge-base --is-ancestor HEAD FETCH_HEAD 2>nul
+git fetch -q -f loom_repo.bundle "+refs/heads/plan-b-studio:refs/remotes/claude/plan-b-studio"
+if errorlevel 1 (
+  echo [warn] could not read loom_repo.bundle - leaving git alone
+  goto :git_done
+)
+git merge-base --is-ancestor HEAD refs/remotes/claude/plan-b-studio 2>nul
 if errorlevel 1 (
   echo [info] plan-b-studio has local commits not in loom_repo.bundle - leaving git alone
   goto :git_done
 )
 rem The working files were already updated by Claude; move the branch and index to match them.
-git reset -q FETCH_HEAD
+git reset -q refs/remotes/claude/plan-b-studio
 for /f %%H in ('git rev-parse --short HEAD') do call :log PASS "git plan-b-studio at %%H"
 :git_done
 
@@ -110,6 +113,16 @@ if not exist "%GZIP%" (
 )
 call :log PASS "Gradle 8.11.1 zip present"
 
+rem ---------- 4a. Unit tests (inspector rules, GGUF reader, Weaver decisions, quality proxy) ----------
+echo [..] running :studio unit tests ^(log: %LOGS%\unit_tests.log^)
+call gradlew.bat --no-daemon --console=plain :studio:testDebugUnitTest > "%LOGS%\unit_tests.log" 2>&1
+if errorlevel 1 (
+  call :log FAIL "unit tests failed - see %LOGS%\unit_tests.log and studio\build\reports\tests"
+  powershell -NoProfile -Command "Get-Content '%LOGS%\unit_tests.log' -Tail 40"
+  goto :fail
+)
+call :log PASS "unit tests passed"
+
 rem ---------- 4. Build ----------
 echo [..] building :studio debug APK. First run downloads AGP 8.7.3, SDK 35 and libraries ^(several minutes^).
 echo      Full log: %LOGS%\gradle_build.log
@@ -163,6 +176,12 @@ if errorlevel 1 (
   )
 )
 call :log PASS "installed com.loom.studio"
+
+rem Sample models for the import test: put both EfficientDet variants in the phone's Download folder.
+for %%M in (efficientdet_lite0 efficientdet_lite2) do (
+  if exist "app\src\main\assets\%%M.tflite" "%ADB%" -s %DEVICE% push "app\src\main\assets\%%M.tflite" /sdcard/Download/%%M.tflite >nul 2>&1
+)
+call :log PASS "sample models copied to the phone's Download folder"
 
 rem Notification permission up front (Android 13+), so the run-service notification is visible.
 "%ADB%" -s %DEVICE% shell pm grant com.loom.studio android.permission.POST_NOTIFICATIONS >nul 2>&1

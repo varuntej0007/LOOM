@@ -17,12 +17,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -45,16 +47,23 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.loom.studio.StudioApp
+import com.loom.studio.importer.ModelCard
 import com.loom.studio.telemetry.LiveSnapshot
 import kotlinx.coroutines.launch
 import java.util.Locale
 
 /**
- * Screen 1 (brief §11): the model Library. M0 shows the empty state, the Import button
- * (wired up in M1 / M7) and the live LOOM pill fed by the run service.
+ * Screen 1 (brief §11): the model Library — imported models as cards, Import FAB,
+ * and the live LOOM pill fed by the run service.
  */
 @Composable
 fun LibraryScreen(
+    models: List<ModelCard>,
+    importProgress: Float?,
+    message: String?,
+    onDismissMessage: () -> Unit,
+    onImportModel: () -> Unit,
+    onOpen: (ModelCard) -> Unit,
     onStartService: () -> Unit,
     onStopService: () -> Unit,
 ) {
@@ -81,11 +90,11 @@ fun LibraryScreen(
                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                     DropdownMenuItem(
                         text = { Text("Import model (.tflite .task .gguf .onnx)") },
-                        onClick = { menuOpen = false; soon("Model import arrives in M1") },
+                        onClick = { menuOpen = false; onImportModel() },
                     )
                     DropdownMenuItem(
                         text = { Text("Import LOOM project (loom.json)") },
-                        onClick = { menuOpen = false; soon("Project import arrives in M7") },
+                        onClick = { menuOpen = false; soon("LOOM projects (loom.json) arrive in drop 3") },
                     )
                 }
             }
@@ -108,8 +117,73 @@ fun LibraryScreen(
                     onToggleService = { on -> if (on) onStartService() else onStopService() },
                 )
             }
-            item { EmptyLibrary() }
+            if (importProgress != null) {
+                item {
+                    LoomCard {
+                        Text("Importing… ${(importProgress * 100).toInt()}%", fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.height(8.dp))
+                        LinearProgressIndicator(progress = { importProgress }, modifier = Modifier.fillMaxWidth())
+                        Text("Copying into app storage, then inspecting the model.", color = Loom.Muted, fontSize = 12.sp)
+                    }
+                }
+            }
+            if (message != null) {
+                item {
+                    LoomCard {
+                        Text(message, color = Loom.Ink, fontSize = 14.sp)
+                        Spacer(Modifier.height(8.dp))
+                        SecondaryButton("OK", onClick = onDismissMessage)
+                    }
+                }
+            }
+            if (models.isEmpty() && importProgress == null) item { EmptyLibrary() }
+            items(models.size) { i -> ModelRow(models[i]) { onOpen(models[i]) } }
         }
+    }
+}
+
+@Composable
+private fun ModelRow(card: ModelCard, onClick: () -> Unit) {
+    val profiled = remember(card.id) { StudioApp.instance.runtime.profiles(card.id) }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(Loom.Card)
+            .border(1.dp, Loom.Line, RoundedCornerShape(18.dp))
+            .clickable(onClick = onClick)
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)).background(Loom.gradient),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                when (card.kind) {
+                    com.loom.studio.core.TaskKind.VISION -> "👁"
+                    com.loom.studio.core.TaskKind.LLM -> "💬"
+                    com.loom.studio.core.TaskKind.AUDIO -> "🎙"
+                    com.loom.studio.core.TaskKind.TEXT -> "Aa"
+                    com.loom.studio.core.TaskKind.GENERIC -> "∑"
+                },
+                color = Color.White, fontSize = 18.sp,
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(card.displayName, fontWeight = FontWeight.SemiBold, color = Loom.Ink, maxLines = 1)
+            Text("${card.kindLabel} · .${card.format} · ${card.sizeText}", color = Loom.Muted, fontSize = 12.sp)
+            Text(
+                when {
+                    !card.runnable -> "runtime arrives in a later drop"
+                    profiled != null -> "profiled on this phone · ${profiled.rows.size} profiles"
+                    else -> "not profiled yet"
+                },
+                color = if (profiled != null) Loom.Green else Loom.Muted, fontSize = 12.sp,
+            )
+        }
+        Text("›", color = Loom.Muted, fontSize = 22.sp)
     }
 }
 
@@ -162,7 +236,7 @@ fun LoomPill(live: LiveSnapshot, running: Boolean, onToggleService: (Boolean) ->
             Text("LOOM", fontWeight = FontWeight.Bold, color = Loom.Blue, fontSize = 13.sp)
             Spacer(Modifier.width(10.dp))
             Text(
-                if (running) "heat ${fmt2(live.heat)} · ${ma(live.batteryUa)} · ${live.thermalStatus}"
+                if (running) "heat ${fmt2(live.heat)} · ${maL(live.batteryUa)} · ${live.thermalStatus}"
                 else "telemetry off",
                 fontFamily = FontFamily.Monospace, fontSize = 13.sp, color = Loom.Ink,
                 modifier = Modifier.weight(1f),
@@ -177,7 +251,7 @@ fun LoomPill(live: LiveSnapshot, running: Boolean, onToggleService: (Boolean) ->
                 Stat("10 s forecast", fmt3(live.forecast))
                 Stat("Heat (Weaver signal)", fmt3(live.heat) + "  limit 0.80")
                 Stat("Thermal status", live.thermalStatus)
-                Stat("Battery current (raw/1000)", ma(live.batteryUa))
+                Stat("Battery current (raw/1000)", maL(live.batteryUa))
                 Stat("Battery", if (live.batteryPct < 0) "—" else "${live.batteryPct}%" + if (live.charging) " · charging" else "")
                 Stat("Weaver", live.run.status)
                 Stat("LOOM_LIVE lines", live.lines.toString())
@@ -223,6 +297,9 @@ private fun EmptyLibrary() {
             .padding(18.dp)
     ) {
         Text("No models yet", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Loom.Ink)
+        Spacer(Modifier.height(4.dp))
+        Text("Try efficientdet_lite0.tflite from the LOOM repo (app/src/main/assets) — copy it to the phone first.",
+            color = Loom.Muted, fontSize = 13.sp)
         Spacer(Modifier.height(6.dp))
         Text(
             "Tap Import to add a model. Studio inspects it, builds a chiplet pipeline, measures every " +
@@ -267,4 +344,4 @@ private fun Format(ext: String, what: String) {
 private fun fmt2(v: Float) = if (v.isNaN()) "—" else String.format(Locale.US, "%.2f", v)
 private fun fmt3(v: Float) = if (v.isNaN()) "—" else String.format(Locale.US, "%.3f", v)
 /** Battery current is logged raw (µA on most phones; sign is OEM-specific). Shown /1000. */
-private fun ma(ua: Long?) = ua?.let { String.format(Locale.US, "%d mA", it / 1000) } ?: "— mA"
+private fun maL(ua: Long?) = ua?.let { String.format(Locale.US, "%d mA", it / 1000) } ?: "— mA"

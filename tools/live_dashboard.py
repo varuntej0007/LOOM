@@ -32,6 +32,11 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 PACKAGE = "com.loom.runtime"
 ACTION = "com.loom.runtime.CONTROL"
+# LOOM Studio (Plan B) sends "app": "studio" in every LOOM_LIVE line; demo buttons then go to it.
+TARGETS = {
+    "runtime": ("com.loom.runtime", "com.loom.runtime.CONTROL"),
+    "studio": ("com.loom.studio", "com.loom.studio.CONTROL"),
+}
 
 # Only these commands/values can be sent to the phone.
 ALLOWED = {
@@ -485,8 +490,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(503, '{"error":"adb not found"}')
         if not current["serial"]:
             return self._send(503, '{"ok":false,"error":"no phone connected"}')
+        last = state.get("last") or {}
+        package, action = TARGETS.get(last.get("app", "runtime"), (PACKAGE, ACTION))
         r = subprocess.run(
-            [self.adb, "-s", current["serial"], "shell", "am", "broadcast", "-a", ACTION, "-p", PACKAGE,
+            [self.adb, "-s", current["serial"], "shell", "am", "broadcast", "-a", action, "-p", package,
              "--es", "cmd", cmd, "--es", "value", value],
             capture_output=True, text=True, timeout=10,
         )

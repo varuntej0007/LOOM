@@ -16,8 +16,8 @@ android {
         applicationId = "com.loom.studio"
         minSdk = 30 // PowerManager.getThermalHeadroom() needs API 30
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.0.1-m0"
+        versionCode = 2
+        versionName = "0.4.0-m4"
         // The iQOO 15 is arm64; native runtimes (LiteRT, llama.cpp) will ship arm64 only.
         ndk { abiFilters += listOf("arm64-v8a") }
     }
@@ -42,6 +42,12 @@ android {
         compose = true
     }
 
+    testOptions {
+        // Unit tests cover pure-Kotlin logic (inspector rules, Weaver decisions, planner);
+        // Android calls such as Log return defaults instead of throwing.
+        unitTests.isReturnDefaultValues = true
+    }
+
     // Imported models are memory-mapped from app-private storage; bundled samples (later) must
     // stay uncompressed in the APK for the same reason.
     androidResources {
@@ -51,6 +57,11 @@ android {
 
 dependencies {
     val lifecycle = "2.8.7"
+    val cameraX = "1.4.1"   // same as :app
+    // LiteRT 1.4.x = the TensorFlow Lite Interpreter API, Java only (no Kotlin-version coupling
+    // with this repo's Kotlin 2.0.21). LiteRT 2.x (CompiledModel API) pulls lifecycle 2.10 /
+    // Kotlin 2.2 artifacts that this toolchain cannot consume.
+    val litert = "1.4.2"
 
     implementation(platform("androidx.compose:compose-bom:2024.12.01"))
     implementation("androidx.compose.ui:ui")
@@ -62,4 +73,15 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:$lifecycle")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:$lifecycle")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+
+    implementation("androidx.camera:camera-core:$cameraX")
+    implementation("androidx.camera:camera-camera2:$cameraX")
+    implementation("androidx.camera:camera-lifecycle:$cameraX")
+    implementation("androidx.camera:camera-view:$cameraX")
+
+    implementation("com.google.ai.edge.litert:litert:$litert")
+    implementation("com.google.ai.edge.litert:litert-gpu:$litert")
+    implementation("com.google.ai.edge.litert:litert-gpu-api:$litert")
+
+    testImplementation("junit:junit:4.13.2")
 }
