@@ -28,6 +28,7 @@ git init -q
 git fetch -q loom_repo.bundle "refs/heads/*:refs/heads/*"
 git symbolic-ref HEAD refs/heads/plan-b-studio
 git reset -q
+git checkout -- .gitmodules >nul 2>&1
 git remote add origin https://github.com/varuntej0007/LOOM.git
 call :log PASS "git repo restored from loom_repo.bundle, branch plan-b-studio"
 goto :git_done
@@ -47,6 +48,8 @@ if errorlevel 1 (
 )
 rem The working files were already updated by Claude; move the branch and index to match them.
 git reset -q refs/remotes/claude/plan-b-studio
+rem Files Claude cannot write directly (.gitmodules) come from the commit itself.
+git checkout -- .gitmodules >nul 2>&1
 for /f %%H in ('git rev-parse --short HEAD') do call :log PASS "git plan-b-studio at %%H"
 :git_done
 
