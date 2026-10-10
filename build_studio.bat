@@ -16,43 +16,74 @@ echo ============================================================
 echo  LOOM Studio - build debug APK, install, launch, check LOOM_LIVE
 echo ============================================================
 
-rem ---------- 0. Git history (only if this folder came without .git; Claude ships it as loom_repo.bundle) ----------
-if not exist ".git" if exist "loom_repo.bundle" (
-  where git >nul 2>nul
-  if errorlevel 1 (
-    echo [warn] git not on PATH - skipping git setup, the build still works
-  ) else (
-    git init -q
-    git fetch -q loom_repo.bundle "refs/heads/*:refs/heads/*"
-    git symbolic-ref HEAD refs/heads/plan-b-studio
-    git reset -q
-    git remote add origin https://github.com/varuntej0007/LOOM.git
-    call :log PASS "git repo restored from loom_repo.bundle, branch plan-b-studio"
-  )
+rem ---------- 0. Git: restore / fast-forward from loom_repo.bundle (Claude ships commits this way) ----------
+if not exist "loom_repo.bundle" goto :git_done
+where git >nul 2>nul
+if errorlevel 1 (
+  echo [warn] git not on PATH - skipping git sync, the build still works
+  goto :git_done
 )
+if exist ".git" goto :git_sync
+git init -q
+git fetch -q loom_repo.bundle "refs/heads/*:refs/heads/*"
+git symbolic-ref HEAD refs/heads/plan-b-studio
+git reset -q
+git remote add origin https://github.com/varuntej0007/LOOM.git
+call :log PASS "git repo restored from loom_repo.bundle, branch plan-b-studio"
+goto :git_done
+:git_sync
+set "CUR="
+for /f %%B in ('git symbolic-ref --short HEAD 2^>nul') do set "CUR=%%B"
+if not "%CUR%"=="plan-b-studio" goto :git_done
+git fetch -q loom_repo.bundle plan-b-studio 2>nul
+if errorlevel 1 goto :git_done
+git merge-base --is-ancestor HEAD FETCH_HEAD 2>nul
+if errorlevel 1 (
+  echo [info] plan-b-studio has local commits not in loom_repo.bundle - leaving git alone
+  goto :git_done
+)
+rem The working files were already updated by Claude; move the branch and index to match them.
+git reset -q FETCH_HEAD
+for /f %%H in ('git rev-parse --short HEAD') do call :log PASS "git plan-b-studio at %%H"
+:git_done
 
-rem ---------- 1. Java: prefer Android Studio's bundled JDK ----------
-if defined JAVA_HOME if exist "%JAVA_HOME%\bin\java.exe" goto :java_ok
+rem ---------- 1. Java 17-23 ----------
+rem Gradle 8.11.1 and Kotlin 2.0.21 (what this repo pins) cannot run on Java 24+. Android Studio
+rem now bundles Java 25, so if no JDK 17-23 is found, a Temurin JDK 21 is downloaded once into
+rem %USERPROFILE%\.loom-jdk (outside the repo).
+set "LJDK=%USERPROFILE%\.loom-jdk"
+set "PICK="
 for %%D in (
+  "%JAVA_HOME%"
+  "%LJDK%\jdk-21"
   "%ProgramFiles%\Android\Android Studio\jbr"
-  "%ProgramFiles%\Android\Android Studio\jre"
   "%LOCALAPPDATA%\Programs\Android Studio\jbr"
-  "%LOCALAPPDATA%\Programs\Android Studio\jre"
-) do (
-  if exist "%%~D\bin\java.exe" (
-    set "JAVA_HOME=%%~D"
-    goto :java_ok
+) do if not defined PICK call :jdk_try "%%~D"
+if not defined PICK for /d %%D in ("%USERPROFILE%\.jdks\*" "%ProgramFiles%\Java\*" "%ProgramFiles%\Eclipse Adoptium\*" "%ProgramFiles%\Microsoft\jdk-*") do if not defined PICK call :jdk_try "%%~D"
+if not defined PICK (
+  echo [..] no JDK 17-23 found - downloading Temurin JDK 21 ^(~190 MB, first run only^) to %LJDK%
+  if not exist "%LJDK%" mkdir "%LJDK%"
+  curl -L --fail --retry 3 -o "%LJDK%\jdk21.zip" "https://api.adoptium.net/v3/binary/latest/21/ga/windows/x64/jdk/hotspot/normal/eclipse"
+  if errorlevel 1 (
+    call :log FAIL "could not download JDK 21 - check internet, or install any JDK 17-23 and set JAVA_HOME"
+    goto :fail
   )
+  tar -xf "%LJDK%\jdk21.zip" -C "%LJDK%"
+  if errorlevel 1 (
+    call :log FAIL "could not unpack %LJDK%\jdk21.zip"
+    goto :fail
+  )
+  del "%LJDK%\jdk21.zip" 2>nul
+  for /d %%D in ("%LJDK%\jdk-21*") do if not exist "%LJDK%\jdk-21\bin\java.exe" move "%%~D" "%LJDK%\jdk-21" >nul
+  call :jdk_try "%LJDK%\jdk-21"
 )
-for /d %%D in ("%USERPROFILE%\.jdks\*17*" "%USERPROFILE%\.jdks\*21*") do (
-  if exist "%%~D\bin\java.exe" set "JAVA_HOME=%%~D"
-)
-if not defined JAVA_HOME (
-  call :log FAIL "no JDK found - install Android Studio or set JAVA_HOME to a JDK 17+"
+if not defined PICK (
+  call :log FAIL "no usable JDK 17-23 after download - see %LJDK%"
   goto :fail
 )
-:java_ok
-call :log PASS "JAVA_HOME=%JAVA_HOME%"
+set "JAVA_HOME=%PICK%"
+set "PATH=%JAVA_HOME%\bin;%PATH%"
+call :log PASS "JAVA_HOME=%JAVA_HOME% (Java %PICKVER%)"
 
 rem ---------- 2. Android SDK ----------
 if not defined ANDROID_HOME set "ANDROID_HOME=%LOCALAPPDATA%\Android\Sdk"
@@ -186,4 +217,23 @@ exit /b 1
 :log
 echo [%~1] %~2
 >> "%SUMMARY%" echo [%~1] %~2
+exit /b 0
+
+:jdk_try
+rem Accept a JDK folder whose release file says JAVA_VERSION 17..23.
+if "%~1"=="" exit /b 0
+if not exist "%~1\bin\java.exe" exit /b 0
+if not exist "%~1\release" exit /b 0
+set "JV="
+for /f "tokens=2 delims==" %%V in ('findstr /b /c:"JAVA_VERSION=" "%~1\release"') do set "JV=%%~V"
+if not defined JV exit /b 0
+set "JMAJ="
+for /f "delims=." %%M in ("%JV%") do set "JMAJ=%%M"
+if not defined JMAJ exit /b 0
+if %JMAJ% GEQ 17 if %JMAJ% LEQ 23 (
+  set "PICK=%~1"
+  set "PICKVER=%JV%"
+) else (
+  echo [info] skipping %~1 - Java %JV% is too new for Gradle 8.11 / Kotlin 2.0
+)
 exit /b 0
