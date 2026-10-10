@@ -1,0 +1,26 @@
+*.iml
+.gradle/
+/local.properties
+/.idea/
+.DS_Store
+/build/
+/app/build/
+/captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+# Pulled telemetry stays out of the repo unless deliberately added to /evidence
+/csv/
+/LOOM.apk
+/keystore.properties
+/*.jks
+/gradle/wrapper/gradle-*-bin.zip
+/live_logs/
+/crash_log.txt
+/.phone_wifi
+__pycache__/
+
+# Kotlin compiler cache and npm packages
+.kotlin/
+node_modules/

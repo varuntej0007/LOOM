@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Themed-icon (monochrome) version of the infinity mark. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:pathData="M54.00,54.00 C59.44,46.58 64.88,41.00 71.23,41.00 C78.48,41.00 83.00,47.03 83.00,54.00 C83.00,60.97 78.48,67.00 71.23,67.00 C64.88,67.00 59.44,61.42 54.00,54.00 C48.56,46.58 43.12,41.00 36.77,41.00 C29.52,41.00 25.00,47.03 25.00,54.00 C25.00,60.97 29.52,67.00 36.77,67.00 C43.12,67.00 48.56,61.42 54.00,54.00"
+        android:strokeColor="#FFFFFFFF" android:strokeWidth="7.5"
+        android:strokeLineCap="round" android:strokeLineJoin="round" />
+</vector>

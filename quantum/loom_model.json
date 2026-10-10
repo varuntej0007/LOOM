@@ -1,0 +1,146 @@
+{
+  "about": "Inputs to LOOM's profile optimiser. Power and thermal numbers come from the iQOO 15 runs of 10 Oct 2026 (live_logs/, unplugged, airplane mode). 'source' says how each number was obtained.",
+  "device": "iQOO 15 (I2501)",
+  "heat_limit": 0.8,
+  "plan_horizon_s": 180,
+  "power_unit_mA": 10,
+  "goals_fps": [
+    10,
+    15,
+    20
+  ],
+  "heat_buckets": [
+    {
+      "name": "cool",
+      "lo": 0.0,
+      "hi": 0.65,
+      "plan_at": 0.6
+    },
+    {
+      "name": "mild",
+      "lo": 0.65,
+      "hi": 0.7,
+      "plan_at": 0.675
+    },
+    {
+      "name": "warm",
+      "lo": 0.7,
+      "hi": 0.75,
+      "plan_at": 0.725
+    },
+    {
+      "name": "near",
+      "lo": 0.75,
+      "hi": 0.8,
+      "plan_at": 0.775
+    },
+    {
+      "name": "over",
+      "lo": 0.8,
+      "hi": 9.99,
+      "plan_at": 0.825
+    }
+  ],
+  "thermal": {
+    "model": "dh/dt = a*P - b*(h - h_idle)   (h = Android thermal headroom, P = battery draw in mA)",
+    "a_per_mA_s": 1.294e-06,
+    "b_per_s": 0.0044,
+    "h_idle": 0.669,
+    "fit_r2": 0.82,
+    "source": "least-squares fit, 117 one-minute windows from 2,257 s of unplugged runs (quantum/calibrate.py)"
+  },
+  "base_power_mA": {
+    "value": 1050,
+    "source": "measured: median battery draw with every chiplet at HIGH, 1,008 s (Fixed run)"
+  },
+  "chiplets": {
+    "Display": {
+      "levels": {
+        "HIGH": {
+          "label": "screen normal",
+          "power_mA": 0,
+          "quality_loss": 0
+        },
+        "BALANCED": {
+          "label": "screen 35%",
+          "power_mA": -10,
+          "quality_loss": 1
+        },
+        "ECO": {
+          "label": "screen 8%",
+          "power_mA": -30,
+          "quality_loss": 2
+        }
+      },
+      "source": "power: small — measured effect within noise (±100 mA); quality: a blind user does not rely on the screen"
+    },
+    "Inference": {
+      "levels": {
+        "HIGH": {
+          "label": "lite2/GPU",
+          "power_mA": 0,
+          "max_fps": 13.9,
+          "quality_loss": 0
+        },
+        "BALANCED": {
+          "label": "lite0/GPU",
+          "power_mA": -130,
+          "max_fps": 21.0,
+          "quality_loss": 4
+        },
+        "ECO": {
+          "label": "lite0/CPU",
+          "power_mA": 50,
+          "max_fps": 12.3,
+          "quality_loss": 5
+        }
+      },
+      "source": "power: measured pairs (1,056 → 927 mA lite2→lite0 GPU; CPU 183 mA above GPU at the same settings); fps: measured latency 72 / ~48 / 81 ms; quality: COCO mAP 34.0 (Lite2) vs 25.7 (Lite0)"
+    },
+    "Capture": {
+      "levels": {
+        "HIGH": {
+          "label": "camera 30/s",
+          "power_mA": 0,
+          "camera_fps": 30,
+          "quality_loss": 0
+        },
+        "BALANCED": {
+          "label": "camera 15/s",
+          "power_mA": -180,
+          "camera_fps": 15,
+          "quality_loss": 3
+        },
+        "ECO": {
+          "label": "camera 10/s",
+          "power_mA": -290,
+          "camera_fps": 10,
+          "quality_loss": 6
+        }
+      },
+      "source": "power: measured (950 → 742 → 616 mA at 30 / 15 / 10 FPS) and regression; quality: slower reaction to moving objects"
+    },
+    "Narrator": {
+      "levels": {
+        "HIGH": {
+          "label": "every 3 s",
+          "power_mA": 0,
+          "quality_loss": 0
+        },
+        "BALANCED": {
+          "label": "every 6 s",
+          "power_mA": -30,
+          "quality_loss": 8
+        },
+        "ECO": {
+          "label": "paused",
+          "power_mA": -40,
+          "quality_loss": 40
+        }
+      },
+      "source": "power: measured pair 616 → 586 mA (3 s → 6 s), pause estimated; quality: speech is the product for a blind user"
+    }
+  },
+  "fps_shortfall_penalty_per_fps": 3.0,
+  "check": "all-HIGH predicts 1,050 mA (measured 1,056); lite0/GPU only 920 (927); 8% + lite0 + 15/s 710 (742); 8% + lite0 + 10/s 600 (616); + speech 6 s 570 (586)"
+}

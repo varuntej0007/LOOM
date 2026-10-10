@@ -1,0 +1,356 @@
+{
+  "version": 1,
+  "generated": "2026-10-09T22:30:19+00:00",
+  "method": "QUBO solved with QAOA (Qiskit 2.5.2, p=5, 4096 shots), every answer checked by brute force: all match",
+  "device": "iQOO 15 (I2501)",
+  "heat_limit": 0.8,
+  "plan_horizon_s": 180,
+  "verified": true,
+  "plans": [
+    {
+      "goal": 10,
+      "bucket": "cool",
+      "heat_lo": 0.0,
+      "heat_hi": 0.65,
+      "levels": {
+        "Display": "HIGH",
+        "Inference": "HIGH",
+        "Capture": "BALANCED",
+        "Narrator": "HIGH"
+      },
+      "labels": {
+        "Display": "screen normal",
+        "Inference": "lite2/GPU",
+        "Capture": "camera 15/s",
+        "Narrator": "every 3 s"
+      },
+      "predicted_mA": 870,
+      "predicted_fps": 13.9,
+      "predicted_heat_3min": 0.778,
+      "limit_reachable": true,
+      "p_optimal": 0.3698
+    },
+    {
+      "goal": 15,
+      "bucket": "cool",
+      "heat_lo": 0.0,
+      "heat_hi": 0.65,
+      "levels": {
+        "Display": "HIGH",
+        "Inference": "BALANCED",
+        "Capture": "HIGH",
+        "Narrator": "HIGH"
+      },
+      "labels": {
+        "Display": "screen normal",
+        "Inference": "lite0/GPU",
+        "Capture": "camera 30/s",
+        "Narrator": "every 3 s"
+      },
+      "predicted_mA": 920,
+      "predicted_fps": 21.0,
+      "predicted_heat_3min": 0.786,
+      "limit_reachable": true,
+      "p_optimal": 0.3881
+    },
+    {
+      "goal": 20,
+      "bucket": "cool",
+      "heat_lo": 0.0,
+      "heat_hi": 0.65,
+      "levels": {
+        "Display": "HIGH",
+        "Inference": "BALANCED",
+        "Capture": "HIGH",
+        "Narrator": "HIGH"
+      },
+      "labels": {
+        "Display": "screen normal",
+        "Inference": "lite0/GPU",
+        "Capture": "camera 30/s",
+        "Narrator": "every 3 s"
+      },
+      "predicted_mA": 920,
+      "predicted_fps": 21.0,
+      "predicted_heat_3min": 0.786,
+      "limit_reachable": true,
+      "p_optimal": 0.3785
+    },
+    {
+      "goal": 10,
+      "bucket": "mild",
+      "heat_lo": 0.65,
+      "heat_hi": 0.7,
+      "levels": {
+        "Display": "HIGH",
+        "Inference": "HIGH",
+        "Capture": "ECO",
+        "Narrator": "HIGH"
+      },
+      "labels": {
+        "Display": "screen normal",
+        "Inference": "lite2/GPU",
+        "Capture": "camera 10/s",
+        "Narrator": "every 3 s"
+      },
+      "predicted_mA": 760,
+      "predicted_fps": 10,
+      "predicted_heat_3min": 0.794,
+      "limit_reachable": true,
+      "p_optimal": 0.5464
+    },
+    {
+      "goal": 15,
+      "bucket": "mild",
+      "heat_lo": 0.65,
+      "heat_hi": 0.7,
+      "levels": {
+        "Display": "HIGH",
+        "Inference": "BALANCED",
+        "Capture": "BALANCED",
+        "Narrator": "HIGH"
+      },
+      "labels": {
+        "Display": "screen normal",
+        "Inference": "lite0/GPU",
+        "Capture": "camera 15/s",
+        "Narrator": "every 3 s"
+      },
+      "predicted_mA": 740,
+      "predicted_fps": 15,
+      "predicted_heat_3min": 0.791,
+      "limit_reachable": true,
+      "p_optimal": 0.5591
+    },
+    {
+      "goal": 20,
+      "bucket": "mild",
+      "heat_lo": 0.65,
+      "heat_hi": 0.7,
+      "levels": {
+        "Display": "HIGH",
+        "Inference": "BALANCED",
+        "Capture": "BALANCED",
+        "Narrator": "HIGH"
+      },
+      "labels": {
+        "Display": "screen normal",
+        "Inference": "lite0/GPU",
+        "Capture": "camera 15/s",
+        "Narrator": "every 3 s"
+      },
+      "predicted_mA": 740,
+      "predicted_fps": 15,
+      "predicted_heat_3min": 0.791,
+      "limit_reachable": true,
+      "p_optimal": 0.1024
+    },
+    {
+      "goal": 10,
+      "bucket": "warm",
+      "heat_lo": 0.7,
+      "heat_hi": 0.75,
+      "levels": {
+        "Display": "HIGH",
+        "Inference": "BALANCED",
+        "Capture": "ECO",
+        "Narrator": "HIGH"
+      },
+      "labels": {
+        "Display": "screen normal",
+        "Inference": "lite0/GPU",
+        "Capture": "camera 10/s",
+        "Narrator": "every 3 s"
+      },
+      "predicted_mA": 630,
+      "predicted_fps": 10,
+      "predicted_heat_3min": 0.796,
+      "limit_reachable": true,
+      "p_optimal": 0.5668
+    },
+    {
+      "goal": 15,
+      "bucket": "warm",
+      "heat_lo": 0.7,
+      "heat_hi": 0.75,
+      "levels": {
+        "Display": "HIGH",
+        "Inference": "BALANCED",
+        "Capture": "ECO",
+        "Narrator": "HIGH"
+      },
+      "labels": {
+        "Display": "screen normal",
+        "Inference": "lite0/GPU",
+        "Capture": "camera 10/s",
+        "Narrator": "every 3 s"
+      },
+      "predicted_mA": 630,
+      "predicted_fps": 10,
+      "predicted_heat_3min": 0.796,
+      "limit_reachable": true,
+      "p_optimal": 0.0056
+    },
+    {
+      "goal": 20,
+      "bucket": "warm",
+      "heat_lo": 0.7,
+      "heat_hi": 0.75,
+      "levels": {
+        "Display": "HIGH",
+        "Inference": "BALANCED",
+        "Capture": "ECO",
+        "Narrator": "HIGH"
+      },
+      "labels": {
+        "Display": "screen normal",
+        "Inference": "lite0/GPU",
+        "Capture": "camera 10/s",
+        "Narrator": "every 3 s"
+      },
+      "predicted_mA": 630,
+      "predicted_fps": 10,
+      "predicted_heat_3min": 0.796,
+      "limit_reachable": true,
+      "p_optimal": 0.0239
+    },
+    {
+      "goal": 10,
+      "bucket": "near",
+      "heat_lo": 0.75,
+      "heat_hi": 0.8,
+      "levels": {
+        "Display": "ECO",
+        "Inference": "BALANCED",
+        "Capture": "ECO",
+        "Narrator": "BALANCED"
+      },
+      "labels": {
+        "Display": "screen 8%",
+        "Inference": "lite0/GPU",
+        "Capture": "camera 10/s",
+        "Narrator": "every 6 s"
+      },
+      "predicted_mA": 570,
+      "predicted_fps": 10,
+      "predicted_heat_3min": 0.809,
+      "limit_reachable": false,
+      "p_optimal": 0.4088
+    },
+    {
+      "goal": 15,
+      "bucket": "near",
+      "heat_lo": 0.75,
+      "heat_hi": 0.8,
+      "levels": {
+        "Display": "ECO",
+        "Inference": "BALANCED",
+        "Capture": "ECO",
+        "Narrator": "BALANCED"
+      },
+      "labels": {
+        "Display": "screen 8%",
+        "Inference": "lite0/GPU",
+        "Capture": "camera 10/s",
+        "Narrator": "every 6 s"
+      },
+      "predicted_mA": 570,
+      "predicted_fps": 10,
+      "predicted_heat_3min": 0.809,
+      "limit_reachable": false,
+      "p_optimal": 0.3598
+    },
+    {
+      "goal": 20,
+      "bucket": "near",
+      "heat_lo": 0.75,
+      "heat_hi": 0.8,
+      "levels": {
+        "Display": "ECO",
+        "Inference": "BALANCED",
+        "Capture": "ECO",
+        "Narrator": "BALANCED"
+      },
+      "labels": {
+        "Display": "screen 8%",
+        "Inference": "lite0/GPU",
+        "Capture": "camera 10/s",
+        "Narrator": "every 6 s"
+      },
+      "predicted_mA": 570,
+      "predicted_fps": 10,
+      "predicted_heat_3min": 0.809,
+      "limit_reachable": false,
+      "p_optimal": 0.3299
+    },
+    {
+      "goal": 10,
+      "bucket": "over",
+      "heat_lo": 0.8,
+      "heat_hi": 9.99,
+      "levels": {
+        "Display": "ECO",
+        "Inference": "BALANCED",
+        "Capture": "ECO",
+        "Narrator": "BALANCED"
+      },
+      "labels": {
+        "Display": "screen 8%",
+        "Inference": "lite0/GPU",
+        "Capture": "camera 10/s",
+        "Narrator": "every 6 s"
+      },
+      "predicted_mA": 570,
+      "predicted_fps": 10,
+      "predicted_heat_3min": 0.831,
+      "limit_reachable": false,
+      "p_optimal": 0.4088
+    },
+    {
+      "goal": 15,
+      "bucket": "over",
+      "heat_lo": 0.8,
+      "heat_hi": 9.99,
+      "levels": {
+        "Display": "ECO",
+        "Inference": "BALANCED",
+        "Capture": "ECO",
+        "Narrator": "BALANCED"
+      },
+      "labels": {
+        "Display": "screen 8%",
+        "Inference": "lite0/GPU",
+        "Capture": "camera 10/s",
+        "Narrator": "every 6 s"
+      },
+      "predicted_mA": 570,
+      "predicted_fps": 10,
+      "predicted_heat_3min": 0.831,
+      "limit_reachable": false,
+      "p_optimal": 0.3598
+    },
+    {
+      "goal": 20,
+      "bucket": "over",
+      "heat_lo": 0.8,
+      "heat_hi": 9.99,
+      "levels": {
+        "Display": "ECO",
+        "Inference": "BALANCED",
+        "Capture": "ECO",
+        "Narrator": "BALANCED"
+      },
+      "labels": {
+        "Display": "screen 8%",
+        "Inference": "lite0/GPU",
+        "Capture": "camera 10/s",
+        "Narrator": "every 6 s"
+      },
+      "predicted_mA": 570,
+      "predicted_fps": 10,
+      "predicted_heat_3min": 0.831,
+      "limit_reachable": false,
+      "p_optimal": 0.3299
+    }
+  ]
+}

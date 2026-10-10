@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Black window so the launch, the intro animation and the camera blend into one another. -->
+    <style name="Theme.Loom" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/loom_bg</item>
+        <item name="android:statusBarColor">@color/loom_bg</item>
+        <item name="android:navigationBarColor">@color/loom_bg</item>
+    </style>
+</resources>

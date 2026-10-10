@@ -1,0 +1,2841 @@
+{
+  "generated": "2026-10-09T22:30:19+00:00",
+  "qiskit": "2.5.2",
+  "all_match_brute_force": true,
+  "model": {
+    "about": "Inputs to LOOM's profile optimiser. Power and thermal numbers come from the iQOO 15 runs of 10 Oct 2026 (live_logs/, unplugged, airplane mode). 'source' says how each number was obtained.",
+    "device": "iQOO 15 (I2501)",
+    "heat_limit": 0.8,
+    "plan_horizon_s": 180,
+    "power_unit_mA": 10,
+    "goals_fps": [
+      10,
+      15,
+      20
+    ],
+    "heat_buckets": [
+      {
+        "name": "cool",
+        "lo": 0.0,
+        "hi": 0.65,
+        "plan_at": 0.6
+      },
+      {
+        "name": "mild",
+        "lo": 0.65,
+        "hi": 0.7,
+        "plan_at": 0.675
+      },
+      {
+        "name": "warm",
+        "lo": 0.7,
+        "hi": 0.75,
+        "plan_at": 0.725
+      },
+      {
+        "name": "near",
+        "lo": 0.75,
+        "hi": 0.8,
+        "plan_at": 0.775
+      },
+      {
+        "name": "over",
+        "lo": 0.8,
+        "hi": 9.99,
+        "plan_at": 0.825
+      }
+    ],
+    "thermal": {
+      "model": "dh/dt = a*P - b*(h - h_idle)   (h = Android thermal headroom, P = battery draw in mA)",
+      "a_per_mA_s": 1.294e-06,
+      "b_per_s": 0.0044,
+      "h_idle": 0.669,
+      "fit_r2": 0.82,
+      "source": "least-squares fit, 117 one-minute windows from 2,257 s of unplugged runs (quantum/calibrate.py)"
+    },
+    "base_power_mA": {
+      "value": 1050,
+      "source": "measured: median battery draw with every chiplet at HIGH, 1,008 s (Fixed run)"
+    },
+    "chiplets": {
+      "Display": {
+        "levels": {
+          "HIGH": {
+            "label": "screen normal",
+            "power_mA": 0,
+            "quality_loss": 0
+          },
+          "BALANCED": {
+            "label": "screen 35%",
+            "power_mA": -10,
+            "quality_loss": 1
+          },
+          "ECO": {
+            "label": "screen 8%",
+            "power_mA": -30,
+            "quality_loss": 2
+          }
+        },
+        "source": "power: small — measured effect within noise (±100 mA); quality: a blind user does not rely on the screen"
+      },
+      "Inference": {
+        "levels": {
+          "HIGH": {
+            "label": "lite2/GPU",
+            "power_mA": 0,
+            "max_fps": 13.9,
+            "quality_loss": 0
+          },
+          "BALANCED": {
+            "label": "lite0/GPU",
+            "power_mA": -130,
+            "max_fps": 21.0,
+            "quality_loss": 4
+          },
+          "ECO": {
+            "label": "lite0/CPU",
+            "power_mA": 50,
+            "max_fps": 12.3,
+            "quality_loss": 5
+          }
+        },
+        "source": "power: measured pairs (1,056 → 927 mA lite2→lite0 GPU; CPU 183 mA above GPU at the same settings); fps: measured latency 72 / ~48 / 81 ms; quality: COCO mAP 34.0 (Lite2) vs 25.7 (Lite0)"
+      },
+      "Capture": {
+        "levels": {
+          "HIGH": {
+            "label": "camera 30/s",
+            "power_mA": 0,
+            "camera_fps": 30,
+            "quality_loss": 0
+          },
+          "BALANCED": {
+            "label": "camera 15/s",
+            "power_mA": -180,
+            "camera_fps": 15,
+            "quality_loss": 3
+          },
+          "ECO": {
+            "label": "camera 10/s",
+            "power_mA": -290,
+            "camera_fps": 10,
+            "quality_loss": 6
+          }
+        },
+        "source": "power: measured (950 → 742 → 616 mA at 30 / 15 / 10 FPS) and regression; quality: slower reaction to moving objects"
+      },
+      "Narrator": {
+        "levels": {
+          "HIGH": {
+            "label": "every 3 s",
+            "power_mA": 0,
+            "quality_loss": 0
+          },
+          "BALANCED": {
+            "label": "every 6 s",
+            "power_mA": -30,
+            "quality_loss": 8
+          },
+          "ECO": {
+            "label": "paused",
+            "power_mA": -40,
+            "quality_loss": 40
+          }
+        },
+        "source": "power: measured pair 616 → 586 mA (3 s → 6 s), pause estimated; quality: speech is the product for a blind user"
+      }
+    },
+    "fps_shortfall_penalty_per_fps": 3.0,
+    "check": "all-HIGH predicts 1,050 mA (measured 1,056); lite0/GPU only 920 (927); 8% + lite0 + 15/s 710 (742); 8% + lite0 + 10/s 600 (616); + speech 6 s 570 (586)"
+  },
+  "problems": [
+    {
+      "goal": 10,
+      "bucket": "cool",
+      "heat_lo": 0.0,
+      "heat_hi": 0.65,
+      "plan_at": 0.6,
+      "levels": {
+        "Display": "HIGH",
+        "Inference": "HIGH",
+        "Capture": "BALANCED",
+        "Narrator": "HIGH"
+      },
+      "labels": {
+        "Display": "screen normal",
+        "Inference": "lite2/GPU",
+        "Capture": "camera 15/s",
+        "Narrator": "every 3 s"
+      },
+      "predicted_mA": 870,
+      "predicted_fps": 13.9,
+      "predicted_heat_3min": 0.778,
+      "budget_mA": 1008,
+      "limit_reachable": true,
+      "quality_loss": 3.0,
+      "qaoa": {
+        "qubits": 11,
+        "mixer": "XY ring per chiplet (keeps one profile per chiplet)",
+        "reps": 5,
+        "heat_price": 0.2188,
+        "price_search": [
+          {
+            "price": 0.0,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "HIGH",
+              "Capture": "HIGH",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 2.0,
+            "answer": {
+              "Display": "ECO",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 1.0,
+            "answer": {
+              "Display": "ECO",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 0.5,
+            "answer": {
+              "Display": "BALANCED",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 0.25,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "HIGH",
+              "Capture": "ECO",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 0.125,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "HIGH",
+              "Capture": "HIGH",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 0.1875,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "HIGH",
+              "Capture": "HIGH",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 0.2188,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "HIGH",
+              "Capture": "ECO",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 0.2031,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "HIGH",
+              "Capture": "HIGH",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 0.2109,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "HIGH",
+              "Capture": "HIGH",
+              "Narrator": "HIGH"
+            }
+          }
+        ],
+        "energy_evaluations": 24000,
+        "gammas": [
+          1.306,
+          1.6975,
+          2.0096,
+          2.1224,
+          2.3159
+        ],
+        "betas": [
+          2.5272,
+          1.5742,
+          1.351,
+          0.2704,
+          0.3118
+        ],
+        "p_optimal": 0.3698,
+        "p_optimal_random_guess": 0.0185,
+        "amplification": 20.0,
+        "shots": 4096,
+        "shots_optimal": 1545,
+        "shots_valid": 4096,
+        "top_answer": {
+          "Display": "HIGH",
+          "Inference": "HIGH",
+          "Capture": "ECO",
+          "Narrator": "HIGH"
+        },
+        "top_answer_cost": 6.0,
+        "top_answer_probability": 0.5464,
+        "best_sampled": {
+          "Display": "HIGH",
+          "Inference": "HIGH",
+          "Capture": "BALANCED",
+          "Narrator": "HIGH"
+        },
+        "best_sampled_cost": 3.0,
+        "circuit_vs_statevector_max_diff": 2.55351295663786e-15
+      },
+      "check": {
+        "configs": 54,
+        "configs_within_budget": 43,
+        "brute_force_best": {
+          "Display": "HIGH",
+          "Inference": "HIGH",
+          "Capture": "BALANCED",
+          "Narrator": "HIGH"
+        },
+        "brute_force_cost": 3.0,
+        "exact_qubo_with_slack_qubits": 17,
+        "exact_qubo_ground_state": {
+          "Display": "HIGH",
+          "Inference": "HIGH",
+          "Capture": "BALANCED",
+          "Narrator": "HIGH"
+        },
+        "exact_qubo_ground_state_cost": 3.0,
+        "qaoa_matches_brute_force": true
+      },
+      "seconds": 101.9
+    },
+    {
+      "goal": 15,
+      "bucket": "cool",
+      "heat_lo": 0.0,
+      "heat_hi": 0.65,
+      "plan_at": 0.6,
+      "levels": {
+        "Display": "HIGH",
+        "Inference": "BALANCED",
+        "Capture": "HIGH",
+        "Narrator": "HIGH"
+      },
+      "labels": {
+        "Display": "screen normal",
+        "Inference": "lite0/GPU",
+        "Capture": "camera 30/s",
+        "Narrator": "every 3 s"
+      },
+      "predicted_mA": 920,
+      "predicted_fps": 21.0,
+      "predicted_heat_3min": 0.786,
+      "budget_mA": 1008,
+      "limit_reachable": true,
+      "quality_loss": 4.0,
+      "qaoa": {
+        "qubits": 11,
+        "mixer": "XY ring per chiplet (keeps one profile per chiplet)",
+        "reps": 5,
+        "heat_price": 0.1406,
+        "price_search": [
+          {
+            "price": 0.0,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "HIGH",
+              "Capture": "HIGH",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 2.0,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "BALANCED"
+            }
+          },
+          {
+            "price": 1.0,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "BALANCED",
+              "Capture": "BALANCED",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 0.5,
+            "answer": {
+              "Display": "BALANCED",
+              "Inference": "BALANCED",
+              "Capture": "BALANCED",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 0.25,
+            "answer": {
+              "Display": "BALANCED",
+              "Inference": "BALANCED",
+              "Capture": "BALANCED",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 0.125,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "HIGH",
+              "Capture": "HIGH",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 0.1875,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "BALANCED",
+              "Capture": "BALANCED",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 0.1562,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "BALANCED",
+              "Capture": "HIGH",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 0.1406,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "BALANCED",
+              "Capture": "HIGH",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 0.1328,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "HIGH",
+              "Capture": "HIGH",
+              "Narrator": "HIGH"
+            }
+          }
+        ],
+        "energy_evaluations": 24000,
+        "gammas": [
+          -0.8141,
+          0.7586,
+          0.2135,
+          1.5667,
+          2.2484
+        ],
+        "betas": [
+          1.9299,
+          1.5662,
+          1.275,
+          -0.3412,
+          0.5635
+        ],
+        "p_optimal": 0.3881,
+        "p_optimal_random_guess": 0.0185,
+        "amplification": 21.0,
+        "shots": 4096,
+        "shots_optimal": 1628,
+        "shots_valid": 4096,
+        "top_answer": {
+          "Display": "HIGH",
+          "Inference": "BALANCED",
+          "Capture": "HIGH",
+          "Narrator": "HIGH"
+        },
+        "top_answer_cost": 4.0,
+        "top_answer_probability": 0.3881,
+        "best_sampled": {
+          "Display": "HIGH",
+          "Inference": "BALANCED",
+          "Capture": "HIGH",
+          "Narrator": "HIGH"
+        },
+        "best_sampled_cost": 4.0,
+        "circuit_vs_statevector_max_diff": 4.107825191113079e-15
+      },
+      "check": {
+        "configs": 54,
+        "configs_within_budget": 43,
+        "brute_force_best": {
+          "Display": "HIGH",
+          "Inference": "BALANCED",
+          "Capture": "HIGH",
+          "Narrator": "HIGH"
+        },
+        "brute_force_cost": 4.0,
+        "exact_qubo_with_slack_qubits": 17,
+        "exact_qubo_ground_state": {
+          "Display": "HIGH",
+          "Inference": "BALANCED",
+          "Capture": "HIGH",
+          "Narrator": "HIGH"
+        },
+        "exact_qubo_ground_state_cost": 4.0,
+        "qaoa_matches_brute_force": true
+      },
+      "seconds": 100.4
+    },
+    {
+      "goal": 20,
+      "bucket": "cool",
+      "heat_lo": 0.0,
+      "heat_hi": 0.65,
+      "plan_at": 0.6,
+      "levels": {
+        "Display": "HIGH",
+        "Inference": "BALANCED",
+        "Capture": "HIGH",
+        "Narrator": "HIGH"
+      },
+      "labels": {
+        "Display": "screen normal",
+        "Inference": "lite0/GPU",
+        "Capture": "camera 30/s",
+        "Narrator": "every 3 s"
+      },
+      "predicted_mA": 920,
+      "predicted_fps": 21.0,
+      "predicted_heat_3min": 0.786,
+      "budget_mA": 1008,
+      "limit_reachable": true,
+      "quality_loss": 4.0,
+      "qaoa": {
+        "qubits": 11,
+        "mixer": "XY ring per chiplet (keeps one profile per chiplet)",
+        "reps": 5,
+        "heat_price": 0.0,
+        "price_search": [
+          {
+            "price": 0.0,
+            "answer": {
+              "Display": "BALANCED",
+              "Inference": "BALANCED",
+              "Capture": "HIGH",
+              "Narrator": "HIGH"
+            }
+          }
+        ],
+        "energy_evaluations": 2400,
+        "gammas": [
+          0.2474,
+          -0.7587,
+          -1.1712,
+          -0.6748,
+          0.3109
+        ],
+        "betas": [
+          0.5171,
+          0.6552,
+          0.5405,
+          0.5481,
+          -0.4586
+        ],
+        "p_optimal": 0.3785,
+        "p_optimal_random_guess": 0.0185,
+        "amplification": 20.4,
+        "shots": 4096,
+        "shots_optimal": 1574,
+        "shots_valid": 4096,
+        "top_answer": {
+          "Display": "BALANCED",
+          "Inference": "BALANCED",
+          "Capture": "HIGH",
+          "Narrator": "HIGH"
+        },
+        "top_answer_cost": 5.0,
+        "top_answer_probability": 0.3967,
+        "best_sampled": {
+          "Display": "HIGH",
+          "Inference": "BALANCED",
+          "Capture": "HIGH",
+          "Narrator": "HIGH"
+        },
+        "best_sampled_cost": 4.0,
+        "circuit_vs_statevector_max_diff": 3.1363800445660672e-15
+      },
+      "check": {
+        "configs": 54,
+        "configs_within_budget": 43,
+        "brute_force_best": {
+          "Display": "HIGH",
+          "Inference": "BALANCED",
+          "Capture": "HIGH",
+          "Narrator": "HIGH"
+        },
+        "brute_force_cost": 4.0,
+        "exact_qubo_with_slack_qubits": 17,
+        "exact_qubo_ground_state": {
+          "Display": "HIGH",
+          "Inference": "BALANCED",
+          "Capture": "HIGH",
+          "Narrator": "HIGH"
+        },
+        "exact_qubo_ground_state_cost": 4.0,
+        "qaoa_matches_brute_force": true
+      },
+      "seconds": 11.3
+    },
+    {
+      "goal": 10,
+      "bucket": "mild",
+      "heat_lo": 0.65,
+      "heat_hi": 0.7,
+      "plan_at": 0.675,
+      "levels": {
+        "Display": "HIGH",
+        "Inference": "HIGH",
+        "Capture": "ECO",
+        "Narrator": "HIGH"
+      },
+      "labels": {
+        "Display": "screen normal",
+        "Inference": "lite2/GPU",
+        "Capture": "camera 10/s",
+        "Narrator": "every 3 s"
+      },
+      "predicted_mA": 760,
+      "predicted_fps": 10,
+      "predicted_heat_3min": 0.794,
+      "budget_mA": 797,
+      "limit_reachable": true,
+      "quality_loss": 6.0,
+      "qaoa": {
+        "qubits": 11,
+        "mixer": "XY ring per chiplet (keeps one profile per chiplet)",
+        "reps": 5,
+        "heat_price": 0.2188,
+        "price_search": [
+          {
+            "price": 0.0,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "HIGH",
+              "Capture": "HIGH",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 2.0,
+            "answer": {
+              "Display": "ECO",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 1.0,
+            "answer": {
+              "Display": "ECO",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 0.5,
+            "answer": {
+              "Display": "BALANCED",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 0.25,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "HIGH",
+              "Capture": "ECO",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 0.125,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "HIGH",
+              "Capture": "HIGH",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 0.1875,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "HIGH",
+              "Capture": "HIGH",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 0.2188,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "HIGH",
+              "Capture": "ECO",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 0.2031,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "HIGH",
+              "Capture": "HIGH",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 0.2109,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "HIGH",
+              "Capture": "HIGH",
+              "Narrator": "HIGH"
+            }
+          }
+        ],
+        "energy_evaluations": 24000,
+        "gammas": [
+          1.306,
+          1.6975,
+          2.0096,
+          2.1224,
+          2.3159
+        ],
+        "betas": [
+          2.5272,
+          1.5742,
+          1.351,
+          0.2704,
+          0.3118
+        ],
+        "p_optimal": 0.5464,
+        "p_optimal_random_guess": 0.0185,
+        "amplification": 29.5,
+        "shots": 4096,
+        "shots_optimal": 2224,
+        "shots_valid": 4096,
+        "top_answer": {
+          "Display": "HIGH",
+          "Inference": "HIGH",
+          "Capture": "ECO",
+          "Narrator": "HIGH"
+        },
+        "top_answer_cost": 6.0,
+        "top_answer_probability": 0.5464,
+        "best_sampled": {
+          "Display": "HIGH",
+          "Inference": "HIGH",
+          "Capture": "ECO",
+          "Narrator": "HIGH"
+        },
+        "best_sampled_cost": 6.0,
+        "circuit_vs_statevector_max_diff": 2.55351295663786e-15
+      },
+      "check": {
+        "configs": 54,
+        "configs_within_budget": 22,
+        "brute_force_best": {
+          "Display": "HIGH",
+          "Inference": "HIGH",
+          "Capture": "ECO",
+          "Narrator": "HIGH"
+        },
+        "brute_force_cost": 6.0,
+        "exact_qubo_with_slack_qubits": 17,
+        "exact_qubo_ground_state": {
+          "Display": "HIGH",
+          "Inference": "HIGH",
+          "Capture": "ECO",
+          "Narrator": "HIGH"
+        },
+        "exact_qubo_ground_state_cost": 6.0,
+        "qaoa_matches_brute_force": true
+      },
+      "seconds": 102.8
+    },
+    {
+      "goal": 15,
+      "bucket": "mild",
+      "heat_lo": 0.65,
+      "heat_hi": 0.7,
+      "plan_at": 0.675,
+      "levels": {
+        "Display": "HIGH",
+        "Inference": "BALANCED",
+        "Capture": "BALANCED",
+        "Narrator": "HIGH"
+      },
+      "labels": {
+        "Display": "screen normal",
+        "Inference": "lite0/GPU",
+        "Capture": "camera 15/s",
+        "Narrator": "every 3 s"
+      },
+      "predicted_mA": 740,
+      "predicted_fps": 15,
+      "predicted_heat_3min": 0.791,
+      "budget_mA": 797,
+      "limit_reachable": true,
+      "quality_loss": 7.0,
+      "qaoa": {
+        "qubits": 11,
+        "mixer": "XY ring per chiplet (keeps one profile per chiplet)",
+        "reps": 5,
+        "heat_price": 0.1875,
+        "price_search": [
+          {
+            "price": 0.0,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "HIGH",
+              "Capture": "HIGH",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 2.0,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "BALANCED"
+            }
+          },
+          {
+            "price": 1.0,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "BALANCED",
+              "Capture": "BALANCED",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 0.5,
+            "answer": {
+              "Display": "BALANCED",
+              "Inference": "BALANCED",
+              "Capture": "BALANCED",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 0.25,
+            "answer": {
+              "Display": "BALANCED",
+              "Inference": "BALANCED",
+              "Capture": "BALANCED",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 0.125,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "HIGH",
+              "Capture": "HIGH",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 0.1875,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "BALANCED",
+              "Capture": "BALANCED",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 0.1562,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "BALANCED",
+              "Capture": "HIGH",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 0.1719,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "BALANCED",
+              "Capture": "BALANCED",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 0.1641,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "BALANCED",
+              "Capture": "BALANCED",
+              "Narrator": "HIGH"
+            }
+          }
+        ],
+        "energy_evaluations": 24000,
+        "gammas": [
+          -0.4365,
+          -0.3928,
+          1.9073,
+          1.6973,
+          1.8626
+        ],
+        "betas": [
+          1.9199,
+          1.3158,
+          0.074,
+          0.9097,
+          0.7629
+        ],
+        "p_optimal": 0.5591,
+        "p_optimal_random_guess": 0.0185,
+        "amplification": 30.2,
+        "shots": 4096,
+        "shots_optimal": 2279,
+        "shots_valid": 4096,
+        "top_answer": {
+          "Display": "HIGH",
+          "Inference": "BALANCED",
+          "Capture": "BALANCED",
+          "Narrator": "HIGH"
+        },
+        "top_answer_cost": 7.0,
+        "top_answer_probability": 0.5591,
+        "best_sampled": {
+          "Display": "HIGH",
+          "Inference": "BALANCED",
+          "Capture": "BALANCED",
+          "Narrator": "HIGH"
+        },
+        "best_sampled_cost": 7.0,
+        "circuit_vs_statevector_max_diff": 8.659739592076221e-15
+      },
+      "check": {
+        "configs": 54,
+        "configs_within_budget": 22,
+        "brute_force_best": {
+          "Display": "HIGH",
+          "Inference": "BALANCED",
+          "Capture": "BALANCED",
+          "Narrator": "HIGH"
+        },
+        "brute_force_cost": 7.0,
+        "exact_qubo_with_slack_qubits": 17,
+        "exact_qubo_ground_state": {
+          "Display": "HIGH",
+          "Inference": "BALANCED",
+          "Capture": "BALANCED",
+          "Narrator": "HIGH"
+        },
+        "exact_qubo_ground_state_cost": 7.0,
+        "qaoa_matches_brute_force": true
+      },
+      "seconds": 100.1
+    },
+    {
+      "goal": 20,
+      "bucket": "mild",
+      "heat_lo": 0.65,
+      "heat_hi": 0.7,
+      "plan_at": 0.675,
+      "levels": {
+        "Display": "HIGH",
+        "Inference": "BALANCED",
+        "Capture": "BALANCED",
+        "Narrator": "HIGH"
+      },
+      "labels": {
+        "Display": "screen normal",
+        "Inference": "lite0/GPU",
+        "Capture": "camera 15/s",
+        "Narrator": "every 3 s"
+      },
+      "predicted_mA": 740,
+      "predicted_fps": 15,
+      "predicted_heat_3min": 0.791,
+      "budget_mA": 797,
+      "limit_reachable": true,
+      "quality_loss": 22.0,
+      "qaoa": {
+        "qubits": 11,
+        "mixer": "XY ring per chiplet (keeps one profile per chiplet)",
+        "reps": 5,
+        "heat_price": 1.0,
+        "price_search": [
+          {
+            "price": 0.0,
+            "answer": {
+              "Display": "BALANCED",
+              "Inference": "BALANCED",
+              "Capture": "HIGH",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 2.0,
+            "answer": {
+              "Display": "BALANCED",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "BALANCED"
+            }
+          },
+          {
+            "price": 1.0,
+            "answer": {
+              "Display": "BALANCED",
+              "Inference": "BALANCED",
+              "Capture": "BALANCED",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 0.5,
+            "answer": {
+              "Display": "BALANCED",
+              "Inference": "BALANCED",
+              "Capture": "HIGH",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 0.75,
+            "answer": {
+              "Display": "BALANCED",
+              "Inference": "BALANCED",
+              "Capture": "BALANCED",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 0.625,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "BALANCED",
+              "Capture": "HIGH",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 0.6875,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "BALANCED",
+              "Capture": "HIGH",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 0.7188,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "BALANCED",
+              "Capture": "HIGH",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 0.7344,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "BALANCED",
+              "Capture": "HIGH",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 0.7422,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "BALANCED",
+              "Capture": "HIGH",
+              "Narrator": "HIGH"
+            }
+          }
+        ],
+        "energy_evaluations": 24000,
+        "gammas": [
+          0.4754,
+          -0.6045,
+          -0.6657,
+          -0.181,
+          0.5342
+        ],
+        "betas": [
+          1.2869,
+          0.9023,
+          0.3855,
+          0.8986,
+          -0.7064
+        ],
+        "p_optimal": 0.1024,
+        "p_optimal_random_guess": 0.0185,
+        "amplification": 5.5,
+        "shots": 4096,
+        "shots_optimal": 454,
+        "shots_valid": 4096,
+        "top_answer": {
+          "Display": "BALANCED",
+          "Inference": "BALANCED",
+          "Capture": "BALANCED",
+          "Narrator": "HIGH"
+        },
+        "top_answer_cost": 23.0,
+        "top_answer_probability": 0.4814,
+        "best_sampled": {
+          "Display": "HIGH",
+          "Inference": "BALANCED",
+          "Capture": "BALANCED",
+          "Narrator": "HIGH"
+        },
+        "best_sampled_cost": 22.0,
+        "circuit_vs_statevector_max_diff": 6.38378239159465e-16
+      },
+      "check": {
+        "configs": 54,
+        "configs_within_budget": 22,
+        "brute_force_best": {
+          "Display": "HIGH",
+          "Inference": "BALANCED",
+          "Capture": "BALANCED",
+          "Narrator": "HIGH"
+        },
+        "brute_force_cost": 22.0,
+        "exact_qubo_with_slack_qubits": 17,
+        "exact_qubo_ground_state": {
+          "Display": "HIGH",
+          "Inference": "BALANCED",
+          "Capture": "BALANCED",
+          "Narrator": "HIGH"
+        },
+        "exact_qubo_ground_state_cost": 22.0,
+        "qaoa_matches_brute_force": true
+      },
+      "seconds": 99.6
+    },
+    {
+      "goal": 10,
+      "bucket": "warm",
+      "heat_lo": 0.7,
+      "heat_hi": 0.75,
+      "plan_at": 0.725,
+      "levels": {
+        "Display": "HIGH",
+        "Inference": "BALANCED",
+        "Capture": "ECO",
+        "Narrator": "HIGH"
+      },
+      "labels": {
+        "Display": "screen normal",
+        "Inference": "lite0/GPU",
+        "Capture": "camera 10/s",
+        "Narrator": "every 3 s"
+      },
+      "predicted_mA": 630,
+      "predicted_fps": 10,
+      "predicted_heat_3min": 0.796,
+      "budget_mA": 657,
+      "limit_reachable": true,
+      "quality_loss": 10.0,
+      "qaoa": {
+        "qubits": 11,
+        "mixer": "XY ring per chiplet (keeps one profile per chiplet)",
+        "reps": 5,
+        "heat_price": 0.3125,
+        "price_search": [
+          {
+            "price": 0.0,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "HIGH",
+              "Capture": "HIGH",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 2.0,
+            "answer": {
+              "Display": "ECO",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 1.0,
+            "answer": {
+              "Display": "ECO",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 0.5,
+            "answer": {
+              "Display": "BALANCED",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 0.25,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "HIGH",
+              "Capture": "ECO",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 0.375,
+            "answer": {
+              "Display": "ECO",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 0.3125,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 0.2812,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "HIGH",
+              "Capture": "ECO",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 0.2969,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "HIGH",
+              "Capture": "ECO",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 0.3047,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "HIGH",
+              "Capture": "ECO",
+              "Narrator": "HIGH"
+            }
+          }
+        ],
+        "energy_evaluations": 24000,
+        "gammas": [
+          1.8348,
+          0.7152,
+          1.4484,
+          1.1952,
+          2.5447
+        ],
+        "betas": [
+          1.9765,
+          1.6564,
+          1.1557,
+          0.4208,
+          0.0839
+        ],
+        "p_optimal": 0.5668,
+        "p_optimal_random_guess": 0.0185,
+        "amplification": 30.6,
+        "shots": 4096,
+        "shots_optimal": 2299,
+        "shots_valid": 4096,
+        "top_answer": {
+          "Display": "HIGH",
+          "Inference": "BALANCED",
+          "Capture": "ECO",
+          "Narrator": "HIGH"
+        },
+        "top_answer_cost": 10.0,
+        "top_answer_probability": 0.5668,
+        "best_sampled": {
+          "Display": "HIGH",
+          "Inference": "BALANCED",
+          "Capture": "ECO",
+          "Narrator": "HIGH"
+        },
+        "best_sampled_cost": 10.0,
+        "circuit_vs_statevector_max_diff": 2.3314683517128287e-15
+      },
+      "check": {
+        "configs": 54,
+        "configs_within_budget": 6,
+        "brute_force_best": {
+          "Display": "HIGH",
+          "Inference": "BALANCED",
+          "Capture": "ECO",
+          "Narrator": "HIGH"
+        },
+        "brute_force_cost": 10.0,
+        "exact_qubo_with_slack_qubits": 16,
+        "exact_qubo_ground_state": {
+          "Display": "HIGH",
+          "Inference": "BALANCED",
+          "Capture": "ECO",
+          "Narrator": "HIGH"
+        },
+        "exact_qubo_ground_state_cost": 10.0,
+        "qaoa_matches_brute_force": true
+      },
+      "seconds": 97.3
+    },
+    {
+      "goal": 15,
+      "bucket": "warm",
+      "heat_lo": 0.7,
+      "heat_hi": 0.75,
+      "plan_at": 0.725,
+      "levels": {
+        "Display": "HIGH",
+        "Inference": "BALANCED",
+        "Capture": "ECO",
+        "Narrator": "HIGH"
+      },
+      "labels": {
+        "Display": "screen normal",
+        "Inference": "lite0/GPU",
+        "Capture": "camera 10/s",
+        "Narrator": "every 3 s"
+      },
+      "predicted_mA": 630,
+      "predicted_fps": 10,
+      "predicted_heat_3min": 0.796,
+      "budget_mA": 657,
+      "limit_reachable": true,
+      "quality_loss": 25.0,
+      "qaoa": {
+        "qubits": 11,
+        "mixer": "XY ring per chiplet (keeps one profile per chiplet)",
+        "reps": 5,
+        "heat_price": 1.875,
+        "price_search": [
+          {
+            "price": 0.0,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "HIGH",
+              "Capture": "HIGH",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 2.0,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "BALANCED"
+            }
+          },
+          {
+            "price": 1.0,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "BALANCED",
+              "Capture": "BALANCED",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 1.5,
+            "answer": {
+              "Display": "BALANCED",
+              "Inference": "BALANCED",
+              "Capture": "BALANCED",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 1.75,
+            "answer": {
+              "Display": "BALANCED",
+              "Inference": "BALANCED",
+              "Capture": "BALANCED",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 1.875,
+            "answer": {
+              "Display": "BALANCED",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 1.8125,
+            "answer": {
+              "Display": "BALANCED",
+              "Inference": "BALANCED",
+              "Capture": "BALANCED",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 1.8438,
+            "answer": {
+              "Display": "BALANCED",
+              "Inference": "BALANCED",
+              "Capture": "BALANCED",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 1.8594,
+            "answer": {
+              "Display": "BALANCED",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 1.8516,
+            "answer": {
+              "Display": "BALANCED",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "HIGH"
+            }
+          }
+        ],
+        "energy_evaluations": 24000,
+        "gammas": [
+          -0.2214,
+          0.7087,
+          -0.0092,
+          -0.0961,
+          0.4113
+        ],
+        "betas": [
+          1.1585,
+          0.3025,
+          0.9324,
+          0.5242,
+          0.2053
+        ],
+        "p_optimal": 0.0056,
+        "p_optimal_random_guess": 0.0185,
+        "amplification": 0.3,
+        "shots": 4096,
+        "shots_optimal": 26,
+        "shots_valid": 4096,
+        "top_answer": {
+          "Display": "BALANCED",
+          "Inference": "BALANCED",
+          "Capture": "ECO",
+          "Narrator": "HIGH"
+        },
+        "top_answer_cost": 26.0,
+        "top_answer_probability": 0.1455,
+        "best_sampled": {
+          "Display": "HIGH",
+          "Inference": "BALANCED",
+          "Capture": "ECO",
+          "Narrator": "HIGH"
+        },
+        "best_sampled_cost": 25.0,
+        "circuit_vs_statevector_max_diff": 4.579669976578771e-16
+      },
+      "check": {
+        "configs": 54,
+        "configs_within_budget": 6,
+        "brute_force_best": {
+          "Display": "HIGH",
+          "Inference": "BALANCED",
+          "Capture": "ECO",
+          "Narrator": "HIGH"
+        },
+        "brute_force_cost": 25.0,
+        "exact_qubo_with_slack_qubits": 16,
+        "exact_qubo_ground_state": {
+          "Display": "HIGH",
+          "Inference": "BALANCED",
+          "Capture": "ECO",
+          "Narrator": "HIGH"
+        },
+        "exact_qubo_ground_state_cost": 25.0,
+        "qaoa_matches_brute_force": true
+      },
+      "seconds": 98.4
+    },
+    {
+      "goal": 20,
+      "bucket": "warm",
+      "heat_lo": 0.7,
+      "heat_hi": 0.75,
+      "plan_at": 0.725,
+      "levels": {
+        "Display": "HIGH",
+        "Inference": "BALANCED",
+        "Capture": "ECO",
+        "Narrator": "HIGH"
+      },
+      "labels": {
+        "Display": "screen normal",
+        "Inference": "lite0/GPU",
+        "Capture": "camera 10/s",
+        "Narrator": "every 3 s"
+      },
+      "predicted_mA": 630,
+      "predicted_fps": 10,
+      "predicted_heat_3min": 0.796,
+      "budget_mA": 657,
+      "limit_reachable": true,
+      "quality_loss": 40.0,
+      "qaoa": {
+        "qubits": 11,
+        "mixer": "XY ring per chiplet (keeps one profile per chiplet)",
+        "reps": 5,
+        "heat_price": 1.75,
+        "price_search": [
+          {
+            "price": 0.0,
+            "answer": {
+              "Display": "BALANCED",
+              "Inference": "BALANCED",
+              "Capture": "HIGH",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 2.0,
+            "answer": {
+              "Display": "BALANCED",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "BALANCED"
+            }
+          },
+          {
+            "price": 1.0,
+            "answer": {
+              "Display": "BALANCED",
+              "Inference": "BALANCED",
+              "Capture": "BALANCED",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 1.5,
+            "answer": {
+              "Display": "BALANCED",
+              "Inference": "BALANCED",
+              "Capture": "BALANCED",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 1.75,
+            "answer": {
+              "Display": "BALANCED",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "BALANCED"
+            }
+          },
+          {
+            "price": 1.625,
+            "answer": {
+              "Display": "BALANCED",
+              "Inference": "BALANCED",
+              "Capture": "BALANCED",
+              "Narrator": "BALANCED"
+            }
+          },
+          {
+            "price": 1.6875,
+            "answer": {
+              "Display": "BALANCED",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "BALANCED"
+            }
+          },
+          {
+            "price": 1.6562,
+            "answer": {
+              "Display": "BALANCED",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "BALANCED"
+            }
+          },
+          {
+            "price": 1.6406,
+            "answer": {
+              "Display": "BALANCED",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "BALANCED"
+            }
+          },
+          {
+            "price": 1.6328,
+            "answer": {
+              "Display": "BALANCED",
+              "Inference": "BALANCED",
+              "Capture": "BALANCED",
+              "Narrator": "BALANCED"
+            }
+          }
+        ],
+        "energy_evaluations": 24000,
+        "gammas": [
+          -0.2343,
+          0.5593,
+          0.1718,
+          0.7128,
+          1.8485
+        ],
+        "betas": [
+          1.2213,
+          0.7407,
+          0.9562,
+          0.3052,
+          0.1306
+        ],
+        "p_optimal": 0.0239,
+        "p_optimal_random_guess": 0.0185,
+        "amplification": 1.3,
+        "shots": 4096,
+        "shots_optimal": 89,
+        "shots_valid": 4096,
+        "top_answer": {
+          "Display": "BALANCED",
+          "Inference": "BALANCED",
+          "Capture": "ECO",
+          "Narrator": "BALANCED"
+        },
+        "top_answer_cost": 49.0,
+        "top_answer_probability": 0.151,
+        "best_sampled": {
+          "Display": "HIGH",
+          "Inference": "BALANCED",
+          "Capture": "ECO",
+          "Narrator": "HIGH"
+        },
+        "best_sampled_cost": 40.0,
+        "circuit_vs_statevector_max_diff": 2.400857290751901e-15
+      },
+      "check": {
+        "configs": 54,
+        "configs_within_budget": 6,
+        "brute_force_best": {
+          "Display": "HIGH",
+          "Inference": "BALANCED",
+          "Capture": "ECO",
+          "Narrator": "HIGH"
+        },
+        "brute_force_cost": 40.0,
+        "exact_qubo_with_slack_qubits": 16,
+        "exact_qubo_ground_state": {
+          "Display": "HIGH",
+          "Inference": "BALANCED",
+          "Capture": "ECO",
+          "Narrator": "HIGH"
+        },
+        "exact_qubo_ground_state_cost": 40.0,
+        "qaoa_matches_brute_force": true
+      },
+      "seconds": 98.9
+    },
+    {
+      "goal": 10,
+      "bucket": "near",
+      "heat_lo": 0.75,
+      "heat_hi": 0.8,
+      "plan_at": 0.775,
+      "levels": {
+        "Display": "ECO",
+        "Inference": "BALANCED",
+        "Capture": "ECO",
+        "Narrator": "BALANCED"
+      },
+      "labels": {
+        "Display": "screen 8%",
+        "Inference": "lite0/GPU",
+        "Capture": "camera 10/s",
+        "Narrator": "every 6 s"
+      },
+      "predicted_mA": 570,
+      "predicted_fps": 10,
+      "predicted_heat_3min": 0.809,
+      "budget_mA": 516,
+      "limit_reachable": false,
+      "quality_loss": 20.0,
+      "qaoa": {
+        "qubits": 11,
+        "mixer": "XY ring per chiplet (keeps one profile per chiplet)",
+        "reps": 5,
+        "heat_price": 3.0,
+        "price_search": [
+          {
+            "price": 0.0,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "HIGH",
+              "Capture": "HIGH",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 2.0,
+            "answer": {
+              "Display": "ECO",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 4.0,
+            "answer": {
+              "Display": "ECO",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "BALANCED"
+            }
+          },
+          {
+            "price": 3.0,
+            "answer": {
+              "Display": "ECO",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "BALANCED"
+            }
+          },
+          {
+            "price": 2.5,
+            "answer": {
+              "Display": "ECO",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 2.75,
+            "answer": {
+              "Display": "ECO",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "BALANCED"
+            }
+          },
+          {
+            "price": 2.625,
+            "answer": {
+              "Display": "ECO",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 2.6875,
+            "answer": {
+              "Display": "ECO",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "BALANCED"
+            }
+          },
+          {
+            "price": 2.6562,
+            "answer": {
+              "Display": "ECO",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 2.6719,
+            "answer": {
+              "Display": "ECO",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "BALANCED"
+            }
+          },
+          {
+            "price": 2.6641,
+            "answer": {
+              "Display": "ECO",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "HIGH"
+            }
+          }
+        ],
+        "energy_evaluations": 26400,
+        "gammas": [
+          0.006,
+          1.1295,
+          1.9041,
+          1.7107,
+          1.9167
+        ],
+        "betas": [
+          1.9196,
+          1.9285,
+          0.6477,
+          0.4251,
+          1.2779
+        ],
+        "p_optimal": 0.4088,
+        "p_optimal_random_guess": 0.0185,
+        "amplification": 22.1,
+        "shots": 4096,
+        "shots_optimal": 1676,
+        "shots_valid": 4096,
+        "top_answer": {
+          "Display": "ECO",
+          "Inference": "BALANCED",
+          "Capture": "ECO",
+          "Narrator": "BALANCED"
+        },
+        "top_answer_cost": 20.0,
+        "top_answer_probability": 0.4088,
+        "best_sampled": {
+          "Display": "ECO",
+          "Inference": "BALANCED",
+          "Capture": "ECO",
+          "Narrator": "BALANCED"
+        },
+        "best_sampled_cost": 20.0,
+        "circuit_vs_statevector_max_diff": 8.326672684688674e-16
+      },
+      "check": {
+        "configs": 54,
+        "configs_within_budget": 1,
+        "brute_force_best": {
+          "Display": "ECO",
+          "Inference": "BALANCED",
+          "Capture": "ECO",
+          "Narrator": "BALANCED"
+        },
+        "brute_force_cost": 20.0,
+        "exact_qubo_with_slack_qubits": 16,
+        "exact_qubo_ground_state": {
+          "Display": "ECO",
+          "Inference": "BALANCED",
+          "Capture": "ECO",
+          "Narrator": "BALANCED"
+        },
+        "exact_qubo_ground_state_cost": 20.0,
+        "qaoa_matches_brute_force": true
+      },
+      "seconds": 108.4
+    },
+    {
+      "goal": 15,
+      "bucket": "near",
+      "heat_lo": 0.75,
+      "heat_hi": 0.8,
+      "plan_at": 0.775,
+      "levels": {
+        "Display": "ECO",
+        "Inference": "BALANCED",
+        "Capture": "ECO",
+        "Narrator": "BALANCED"
+      },
+      "labels": {
+        "Display": "screen 8%",
+        "Inference": "lite0/GPU",
+        "Capture": "camera 10/s",
+        "Narrator": "every 6 s"
+      },
+      "predicted_mA": 570,
+      "predicted_fps": 10,
+      "predicted_heat_3min": 0.809,
+      "budget_mA": 516,
+      "limit_reachable": false,
+      "quality_loss": 35.0,
+      "qaoa": {
+        "qubits": 11,
+        "mixer": "XY ring per chiplet (keeps one profile per chiplet)",
+        "reps": 5,
+        "heat_price": 4.0,
+        "price_search": [
+          {
+            "price": 0.0,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "HIGH",
+              "Capture": "HIGH",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 2.0,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "BALANCED"
+            }
+          },
+          {
+            "price": 4.0,
+            "answer": {
+              "Display": "ECO",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "BALANCED"
+            }
+          },
+          {
+            "price": 3.0,
+            "answer": {
+              "Display": "ECO",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "BALANCED"
+            }
+          },
+          {
+            "price": 2.5,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "BALANCED"
+            }
+          },
+          {
+            "price": 2.75,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 2.875,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 2.9375,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 2.9688,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "BALANCED"
+            }
+          },
+          {
+            "price": 2.9844,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "BALANCED"
+            }
+          },
+          {
+            "price": 2.9922,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "HIGH"
+            }
+          }
+        ],
+        "energy_evaluations": 26400,
+        "gammas": [
+          0.5607,
+          -0.46,
+          -1.3276,
+          -0.189,
+          1.0452
+        ],
+        "betas": [
+          0.6954,
+          0.8967,
+          0.155,
+          0.1922,
+          -0.1696
+        ],
+        "p_optimal": 0.3598,
+        "p_optimal_random_guess": 0.0185,
+        "amplification": 19.4,
+        "shots": 4096,
+        "shots_optimal": 1475,
+        "shots_valid": 4096,
+        "top_answer": {
+          "Display": "ECO",
+          "Inference": "BALANCED",
+          "Capture": "ECO",
+          "Narrator": "BALANCED"
+        },
+        "top_answer_cost": 35.0,
+        "top_answer_probability": 0.3598,
+        "best_sampled": {
+          "Display": "ECO",
+          "Inference": "BALANCED",
+          "Capture": "ECO",
+          "Narrator": "BALANCED"
+        },
+        "best_sampled_cost": 35.0,
+        "circuit_vs_statevector_max_diff": 1.7763568394002505e-15
+      },
+      "check": {
+        "configs": 54,
+        "configs_within_budget": 1,
+        "brute_force_best": {
+          "Display": "ECO",
+          "Inference": "BALANCED",
+          "Capture": "ECO",
+          "Narrator": "BALANCED"
+        },
+        "brute_force_cost": 35.0,
+        "exact_qubo_with_slack_qubits": 16,
+        "exact_qubo_ground_state": {
+          "Display": "ECO",
+          "Inference": "BALANCED",
+          "Capture": "ECO",
+          "Narrator": "BALANCED"
+        },
+        "exact_qubo_ground_state_cost": 35.0,
+        "qaoa_matches_brute_force": true
+      },
+      "seconds": 109.2
+    },
+    {
+      "goal": 20,
+      "bucket": "near",
+      "heat_lo": 0.75,
+      "heat_hi": 0.8,
+      "plan_at": 0.775,
+      "levels": {
+        "Display": "ECO",
+        "Inference": "BALANCED",
+        "Capture": "ECO",
+        "Narrator": "BALANCED"
+      },
+      "labels": {
+        "Display": "screen 8%",
+        "Inference": "lite0/GPU",
+        "Capture": "camera 10/s",
+        "Narrator": "every 6 s"
+      },
+      "predicted_mA": 570,
+      "predicted_fps": 10,
+      "predicted_heat_3min": 0.809,
+      "budget_mA": 516,
+      "limit_reachable": false,
+      "quality_loss": 50.0,
+      "qaoa": {
+        "qubits": 11,
+        "mixer": "XY ring per chiplet (keeps one profile per chiplet)",
+        "reps": 5,
+        "heat_price": 4.0,
+        "price_search": [
+          {
+            "price": 0.0,
+            "answer": {
+              "Display": "BALANCED",
+              "Inference": "BALANCED",
+              "Capture": "HIGH",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 2.0,
+            "answer": {
+              "Display": "BALANCED",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "BALANCED"
+            }
+          },
+          {
+            "price": 4.0,
+            "answer": {
+              "Display": "ECO",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "BALANCED"
+            }
+          },
+          {
+            "price": 3.0,
+            "answer": {
+              "Display": "ECO",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "BALANCED"
+            }
+          },
+          {
+            "price": 2.5,
+            "answer": {
+              "Display": "BALANCED",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 2.75,
+            "answer": {
+              "Display": "ECO",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "BALANCED"
+            }
+          },
+          {
+            "price": 2.625,
+            "answer": {
+              "Display": "ECO",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 2.6875,
+            "answer": {
+              "Display": "ECO",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "BALANCED"
+            }
+          },
+          {
+            "price": 2.6562,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "BALANCED"
+            }
+          },
+          {
+            "price": 2.6719,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 2.6797,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "BALANCED"
+            }
+          }
+        ],
+        "energy_evaluations": 26400,
+        "gammas": [
+          0.4158,
+          -0.3708,
+          -1.1586,
+          -0.3997,
+          0.7628
+        ],
+        "betas": [
+          0.6596,
+          0.829,
+          0.2688,
+          0.2212,
+          -0.2178
+        ],
+        "p_optimal": 0.3299,
+        "p_optimal_random_guess": 0.0185,
+        "amplification": 17.8,
+        "shots": 4096,
+        "shots_optimal": 1355,
+        "shots_valid": 4096,
+        "top_answer": {
+          "Display": "ECO",
+          "Inference": "BALANCED",
+          "Capture": "ECO",
+          "Narrator": "BALANCED"
+        },
+        "top_answer_cost": 50.0,
+        "top_answer_probability": 0.3299,
+        "best_sampled": {
+          "Display": "ECO",
+          "Inference": "BALANCED",
+          "Capture": "ECO",
+          "Narrator": "BALANCED"
+        },
+        "best_sampled_cost": 50.0,
+        "circuit_vs_statevector_max_diff": 1.1032841307212493e-15
+      },
+      "check": {
+        "configs": 54,
+        "configs_within_budget": 1,
+        "brute_force_best": {
+          "Display": "ECO",
+          "Inference": "BALANCED",
+          "Capture": "ECO",
+          "Narrator": "BALANCED"
+        },
+        "brute_force_cost": 50.0,
+        "exact_qubo_with_slack_qubits": 16,
+        "exact_qubo_ground_state": {
+          "Display": "ECO",
+          "Inference": "BALANCED",
+          "Capture": "ECO",
+          "Narrator": "BALANCED"
+        },
+        "exact_qubo_ground_state_cost": 50.0,
+        "qaoa_matches_brute_force": true
+      },
+      "seconds": 107.4
+    },
+    {
+      "goal": 10,
+      "bucket": "over",
+      "heat_lo": 0.8,
+      "heat_hi": 9.99,
+      "plan_at": 0.825,
+      "levels": {
+        "Display": "ECO",
+        "Inference": "BALANCED",
+        "Capture": "ECO",
+        "Narrator": "BALANCED"
+      },
+      "labels": {
+        "Display": "screen 8%",
+        "Inference": "lite0/GPU",
+        "Capture": "camera 10/s",
+        "Narrator": "every 6 s"
+      },
+      "predicted_mA": 570,
+      "predicted_fps": 10,
+      "predicted_heat_3min": 0.831,
+      "budget_mA": 375,
+      "limit_reachable": false,
+      "quality_loss": 20.0,
+      "qaoa": {
+        "qubits": 11,
+        "mixer": "XY ring per chiplet (keeps one profile per chiplet)",
+        "reps": 5,
+        "heat_price": 3.0,
+        "price_search": [
+          {
+            "price": 0.0,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "HIGH",
+              "Capture": "HIGH",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 2.0,
+            "answer": {
+              "Display": "ECO",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 4.0,
+            "answer": {
+              "Display": "ECO",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "BALANCED"
+            }
+          },
+          {
+            "price": 3.0,
+            "answer": {
+              "Display": "ECO",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "BALANCED"
+            }
+          },
+          {
+            "price": 2.5,
+            "answer": {
+              "Display": "ECO",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 2.75,
+            "answer": {
+              "Display": "ECO",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "BALANCED"
+            }
+          },
+          {
+            "price": 2.625,
+            "answer": {
+              "Display": "ECO",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 2.6875,
+            "answer": {
+              "Display": "ECO",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "BALANCED"
+            }
+          },
+          {
+            "price": 2.6562,
+            "answer": {
+              "Display": "ECO",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 2.6719,
+            "answer": {
+              "Display": "ECO",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "BALANCED"
+            }
+          },
+          {
+            "price": 2.6641,
+            "answer": {
+              "Display": "ECO",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "HIGH"
+            }
+          }
+        ],
+        "energy_evaluations": 26400,
+        "gammas": [
+          0.006,
+          1.1295,
+          1.9041,
+          1.7107,
+          1.9167
+        ],
+        "betas": [
+          1.9196,
+          1.9285,
+          0.6477,
+          0.4251,
+          1.2779
+        ],
+        "p_optimal": 0.4088,
+        "p_optimal_random_guess": 0.0185,
+        "amplification": 22.1,
+        "shots": 4096,
+        "shots_optimal": 1676,
+        "shots_valid": 4096,
+        "top_answer": {
+          "Display": "ECO",
+          "Inference": "BALANCED",
+          "Capture": "ECO",
+          "Narrator": "BALANCED"
+        },
+        "top_answer_cost": 20.0,
+        "top_answer_probability": 0.4088,
+        "best_sampled": {
+          "Display": "ECO",
+          "Inference": "BALANCED",
+          "Capture": "ECO",
+          "Narrator": "BALANCED"
+        },
+        "best_sampled_cost": 20.0,
+        "circuit_vs_statevector_max_diff": 8.326672684688674e-16
+      },
+      "check": {
+        "configs": 54,
+        "configs_within_budget": 1,
+        "brute_force_best": {
+          "Display": "ECO",
+          "Inference": "BALANCED",
+          "Capture": "ECO",
+          "Narrator": "BALANCED"
+        },
+        "brute_force_cost": 20.0,
+        "exact_qubo_with_slack_qubits": 16,
+        "exact_qubo_ground_state": {
+          "Display": "ECO",
+          "Inference": "BALANCED",
+          "Capture": "ECO",
+          "Narrator": "BALANCED"
+        },
+        "exact_qubo_ground_state_cost": 20.0,
+        "qaoa_matches_brute_force": true
+      },
+      "seconds": 108.4
+    },
+    {
+      "goal": 15,
+      "bucket": "over",
+      "heat_lo": 0.8,
+      "heat_hi": 9.99,
+      "plan_at": 0.825,
+      "levels": {
+        "Display": "ECO",
+        "Inference": "BALANCED",
+        "Capture": "ECO",
+        "Narrator": "BALANCED"
+      },
+      "labels": {
+        "Display": "screen 8%",
+        "Inference": "lite0/GPU",
+        "Capture": "camera 10/s",
+        "Narrator": "every 6 s"
+      },
+      "predicted_mA": 570,
+      "predicted_fps": 10,
+      "predicted_heat_3min": 0.831,
+      "budget_mA": 375,
+      "limit_reachable": false,
+      "quality_loss": 35.0,
+      "qaoa": {
+        "qubits": 11,
+        "mixer": "XY ring per chiplet (keeps one profile per chiplet)",
+        "reps": 5,
+        "heat_price": 4.0,
+        "price_search": [
+          {
+            "price": 0.0,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "HIGH",
+              "Capture": "HIGH",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 2.0,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "BALANCED"
+            }
+          },
+          {
+            "price": 4.0,
+            "answer": {
+              "Display": "ECO",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "BALANCED"
+            }
+          },
+          {
+            "price": 3.0,
+            "answer": {
+              "Display": "ECO",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "BALANCED"
+            }
+          },
+          {
+            "price": 2.5,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "BALANCED"
+            }
+          },
+          {
+            "price": 2.75,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 2.875,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 2.9375,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 2.9688,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "BALANCED"
+            }
+          },
+          {
+            "price": 2.9844,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "BALANCED"
+            }
+          },
+          {
+            "price": 2.9922,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "HIGH"
+            }
+          }
+        ],
+        "energy_evaluations": 26400,
+        "gammas": [
+          0.5607,
+          -0.46,
+          -1.3276,
+          -0.189,
+          1.0452
+        ],
+        "betas": [
+          0.6954,
+          0.8967,
+          0.155,
+          0.1922,
+          -0.1696
+        ],
+        "p_optimal": 0.3598,
+        "p_optimal_random_guess": 0.0185,
+        "amplification": 19.4,
+        "shots": 4096,
+        "shots_optimal": 1475,
+        "shots_valid": 4096,
+        "top_answer": {
+          "Display": "ECO",
+          "Inference": "BALANCED",
+          "Capture": "ECO",
+          "Narrator": "BALANCED"
+        },
+        "top_answer_cost": 35.0,
+        "top_answer_probability": 0.3598,
+        "best_sampled": {
+          "Display": "ECO",
+          "Inference": "BALANCED",
+          "Capture": "ECO",
+          "Narrator": "BALANCED"
+        },
+        "best_sampled_cost": 35.0,
+        "circuit_vs_statevector_max_diff": 1.7763568394002505e-15
+      },
+      "check": {
+        "configs": 54,
+        "configs_within_budget": 1,
+        "brute_force_best": {
+          "Display": "ECO",
+          "Inference": "BALANCED",
+          "Capture": "ECO",
+          "Narrator": "BALANCED"
+        },
+        "brute_force_cost": 35.0,
+        "exact_qubo_with_slack_qubits": 16,
+        "exact_qubo_ground_state": {
+          "Display": "ECO",
+          "Inference": "BALANCED",
+          "Capture": "ECO",
+          "Narrator": "BALANCED"
+        },
+        "exact_qubo_ground_state_cost": 35.0,
+        "qaoa_matches_brute_force": true
+      },
+      "seconds": 110.2
+    },
+    {
+      "goal": 20,
+      "bucket": "over",
+      "heat_lo": 0.8,
+      "heat_hi": 9.99,
+      "plan_at": 0.825,
+      "levels": {
+        "Display": "ECO",
+        "Inference": "BALANCED",
+        "Capture": "ECO",
+        "Narrator": "BALANCED"
+      },
+      "labels": {
+        "Display": "screen 8%",
+        "Inference": "lite0/GPU",
+        "Capture": "camera 10/s",
+        "Narrator": "every 6 s"
+      },
+      "predicted_mA": 570,
+      "predicted_fps": 10,
+      "predicted_heat_3min": 0.831,
+      "budget_mA": 375,
+      "limit_reachable": false,
+      "quality_loss": 50.0,
+      "qaoa": {
+        "qubits": 11,
+        "mixer": "XY ring per chiplet (keeps one profile per chiplet)",
+        "reps": 5,
+        "heat_price": 4.0,
+        "price_search": [
+          {
+            "price": 0.0,
+            "answer": {
+              "Display": "BALANCED",
+              "Inference": "BALANCED",
+              "Capture": "HIGH",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 2.0,
+            "answer": {
+              "Display": "BALANCED",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "BALANCED"
+            }
+          },
+          {
+            "price": 4.0,
+            "answer": {
+              "Display": "ECO",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "BALANCED"
+            }
+          },
+          {
+            "price": 3.0,
+            "answer": {
+              "Display": "ECO",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "BALANCED"
+            }
+          },
+          {
+            "price": 2.5,
+            "answer": {
+              "Display": "BALANCED",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 2.75,
+            "answer": {
+              "Display": "ECO",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "BALANCED"
+            }
+          },
+          {
+            "price": 2.625,
+            "answer": {
+              "Display": "ECO",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 2.6875,
+            "answer": {
+              "Display": "ECO",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "BALANCED"
+            }
+          },
+          {
+            "price": 2.6562,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "BALANCED"
+            }
+          },
+          {
+            "price": 2.6719,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "HIGH"
+            }
+          },
+          {
+            "price": 2.6797,
+            "answer": {
+              "Display": "HIGH",
+              "Inference": "BALANCED",
+              "Capture": "ECO",
+              "Narrator": "BALANCED"
+            }
+          }
+        ],
+        "energy_evaluations": 26400,
+        "gammas": [
+          0.4158,
+          -0.3708,
+          -1.1586,
+          -0.3997,
+          0.7628
+        ],
+        "betas": [
+          0.6596,
+          0.829,
+          0.2688,
+          0.2212,
+          -0.2178
+        ],
+        "p_optimal": 0.3299,
+        "p_optimal_random_guess": 0.0185,
+        "amplification": 17.8,
+        "shots": 4096,
+        "shots_optimal": 1355,
+        "shots_valid": 4096,
+        "top_answer": {
+          "Display": "ECO",
+          "Inference": "BALANCED",
+          "Capture": "ECO",
+          "Narrator": "BALANCED"
+        },
+        "top_answer_cost": 50.0,
+        "top_answer_probability": 0.3299,
+        "best_sampled": {
+          "Display": "ECO",
+          "Inference": "BALANCED",
+          "Capture": "ECO",
+          "Narrator": "BALANCED"
+        },
+        "best_sampled_cost": 50.0,
+        "circuit_vs_statevector_max_diff": 1.1032841307212493e-15
+      },
+      "check": {
+        "configs": 54,
+        "configs_within_budget": 1,
+        "brute_force_best": {
+          "Display": "ECO",
+          "Inference": "BALANCED",
+          "Capture": "ECO",
+          "Narrator": "BALANCED"
+        },
+        "brute_force_cost": 50.0,
+        "exact_qubo_with_slack_qubits": 16,
+        "exact_qubo_ground_state": {
+          "Display": "ECO",
+          "Inference": "BALANCED",
+          "Capture": "ECO",
+          "Narrator": "BALANCED"
+        },
+        "exact_qubo_ground_state_cost": 50.0,
+        "qaoa_matches_brute_force": true
+      },
+      "seconds": 109.5
+    }
+  ]
+}
