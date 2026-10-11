@@ -48,6 +48,13 @@ class VisionPipeline(
 
     private var unitNo = 0L
 
+    /** Shape Preprocess/Postprocess to [s]'s tensors (no-op when they already match). */
+    fun adapt(s: com.loom.studio.runtime.Session?) {
+        s ?: return
+        s.inputSpecs?.firstOrNull()?.let { if (preprocess.retarget(it)) onEvent("Preprocess → ${it.shapeText} ${it.dtype} for ${s.label}") }
+        postprocess.retarget(s.inputSpecs, s.outputSpecs)
+    }
+
     init {
         wireInference()
     }
@@ -74,6 +81,7 @@ class VisionPipeline(
             image.close()
             return
         }
+        if (!paused) adapt(inference.session)
         val tCap = Clock.nowNs()
         val input = try {
             preprocess.process(image)

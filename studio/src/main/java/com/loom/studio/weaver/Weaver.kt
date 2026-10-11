@@ -103,6 +103,7 @@ class Weaver(
     fun setGoal(v: Double): Unit = synchronized(lock) {
         core.goal = v
         core.resetWindows()
+        core.clearRest()
         applyPacing()
         note("Goal → ≥ ${WeaverCore.f1(v)} ${pipeline.unitName}/s")
     }
@@ -125,7 +126,8 @@ class Weaver(
     private fun adaptive(): List<StudioChiplet> = pipeline.chiplets.filter { it.adaptive }
 
     private fun applyPacing() {
-        val pace = if (core.mode == Mode.ADAPTIVE) core.goal + 3.0 else null
+        if (core.mode != Mode.ADAPTIVE) core.clearRest()
+        val pace = if (core.mode == Mode.ADAPTIVE) (core.restPace ?: (core.goal + 3.0)) else null
         pipeline.setPace(pace)
         pipeline.adpf.setTarget(1000.0 / (pace ?: 60.0))
     }
@@ -186,6 +188,7 @@ class Weaver(
             is Decision.Raise -> apply(d.key, lower = false, d.reason)
             is Decision.SwitchMode -> note("Safety guard: ${d.reason} → ${d.mode.label}")
             is Decision.Floor -> note(d.reason)
+            is Decision.Rest -> { decisions++; lastDecision = d.reason; note(d.reason) }
             is Decision.Hold -> Unit
         }
         lastStatus = d.status

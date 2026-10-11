@@ -101,4 +101,21 @@ class WeaverCoreTest {
             assertTrue(d.toString(), d !is Decision.Raise)
         }
     }
+
+    /** Hot with every chiplet at its floor: rest halves the processed rate, then lifts it once cool. */
+    @Test fun restWhenHotAtFloorThenLift() {
+        val core = WeaverCore().apply { goal = 15.0; heatLimit = 0.8f }
+        val chips = listOf(ChipState("inference", "Inference", Level.ECO, false, true))
+        val rests = mutableListOf<Double?>()
+        var t = 0L
+        repeat(60) { val d = core.step(Sense(10.0, 12.0, 0.95f, 2, true, true), chips, t++); if (d is Decision.Rest) rests += d.pace }
+        assertEquals(listOf<Double?>(5.0, 2.5, 1.25, 1.0, 0.2), rests)
+        assertEquals(0.2, core.restPace!!, 1e-9)
+        // Cool: eases ×2 every ~10 s until the goal is reachable again, then rest is lifted.
+        val eases = mutableListOf<Double?>()
+        repeat(200) { val d = core.step(Sense(0.2, 12.0, 0.6f, 0, true, true), chips, t++); if (d is Decision.Rest) eases += d.pace }
+        assertEquals(null, core.restPace)
+        assertEquals(listOf<Double?>(0.4, 0.8, 1.6, 3.2, 6.4, 12.8, null), eases)
+        // While resting it never raised a chiplet.
+    }
 }

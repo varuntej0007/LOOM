@@ -105,6 +105,7 @@ class Profiler(
                     continue
                 }
                 try {
+                    (pipeline as? VisionPipeline)?.adapt(session) // this profile may be a different-size model
                     repeat(3) { session.run(inputFor(it % sampleCount)) }  // warm-up
                     val outs = mutableListOf<UnitResult>()
                     val lat = mutableListOf<Double>()

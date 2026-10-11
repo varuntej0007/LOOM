@@ -45,9 +45,18 @@ class Postprocess(card: ModelCard, private val scoreThreshold: Float = 0.4f) :
     FixedChiplet("Postprocess", "postprocess", headLabel(card.head)) {
 
     private val head = card.head
-    private val outputs = card.outputs
-    private val inputW = card.inputs.firstOrNull()?.shape?.let { if (it.size == 4) (if (it[1] == 3) it[3] else it[2]) else 1 } ?: 1
-    private val inputH = card.inputs.firstOrNull()?.shape?.let { if (it.size == 4) (if (it[1] == 3) it[2] else it[1]) else 1 } ?: 1
+    @Volatile private var outputs = card.outputs
+    private var inputW = widthOf(card.inputs.firstOrNull())
+    private var inputH = heightOf(card.inputs.firstOrNull())
+
+    /** Follow the live model's signature (projects can mix models of different sizes). */
+    fun retarget(inputs: List<TensorSpec>?, outs: List<TensorSpec>?) {
+        if (outs != null && outs.isNotEmpty() && outs != outputs) outputs = outs
+        inputs?.firstOrNull()?.let { inputW = widthOf(it); inputH = heightOf(it) }
+    }
+
+    private fun widthOf(t: TensorSpec?) = t?.shape?.let { if (it.size == 4) (if (it[1] == 3) it[3] else it[2]) else 1 } ?: 1
+    private fun heightOf(t: TensorSpec?) = t?.shape?.let { if (it.size == 4) (if (it[1] == 3) it[2] else it[1]) else 1 } ?: 1
     private val rawLabels = card.labels ?: emptyList()
     /** COCO-style label files start with "???" / "background" for class 0 of the raw model. */
     private val labelOffset = if (rawLabels.firstOrNull()?.lowercase() in setOf("???", "background", "__background__")) 1 else 0

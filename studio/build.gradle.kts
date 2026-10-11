@@ -16,8 +16,8 @@ android {
         applicationId = "com.loom.studio"
         minSdk = 30 // PowerManager.getThermalHeadroom() needs API 30
         targetSdk = 35
-        versionCode = 4
-        versionName = "1.1.0-guard"
+        versionCode = 5
+        versionName = "1.1.1"
         // The iQOO 15 is arm64; native runtimes (LiteRT, llama.cpp) will ship arm64 only.
         ndk { abiFilters += listOf("arm64-v8a") }
         externalNativeBuild {

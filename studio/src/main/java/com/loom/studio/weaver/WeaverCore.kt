@@ -53,6 +53,8 @@ sealed class Decision {
     data class Raise(val key: String, val reason: String, override val status: String = "changed · cooldown") : Decision()
     data class SwitchMode(val mode: Mode, val reason: String, override val status: String = "safety guard") : Decision()
     data class Floor(val reason: String, override val status: String = "at lowest profile — goal not reachable") : Decision()
+    /** Last-resort rest: cap the processed rate at [pace] units/s (null = rest lifted). */
+    data class Rest(val pace: Double?, val reason: String, override val status: String = "resting · cooldown") : Decision()
 }
 
 /**
@@ -65,6 +67,9 @@ sealed class Decision {
  *  - comfortable for 10 s and cool     → raise ONE chiplet, most valuable first (reverse cut order)
  *  - 5 s cooldown after any change, upgrade back-off when an upgrade had to be undone
  *  - Fixed mode at SEVERE for 20 s     → switch to Adaptive (Android otherwise closes the camera)
+ *  - still hot with EVERY chiplet at its lowest profile → REST: halve the processed rate
+ *    (goal/2 → … → 1/s → one unit every 5 s), 10 s apart. The lowest profile still makes heat,
+ *    so this is the only lever left. Lifted step by step (rate ×2) after 10 s below limit − margin.
  */
 class WeaverCore(val policy: Policy = Policy()) {
     var mode: Mode = Mode.ADAPTIVE
@@ -80,6 +85,10 @@ class WeaverCore(val policy: Policy = Policy()) {
     private var planSecs = 0
     private var cooldown = 0
     private var floorNoted = false
+    /** Processed-rate cap while resting (units/s); null = not resting. */
+    var restPace: Double? = null
+        private set
+    private var restCoolSecs = 0
     private class Backoff(var blockedUntil: Long = 0, var length: Int = 0, var lastRaise: Long = -1_000_000)
     private val backoff = HashMap<String, Backoff>()
 
@@ -114,8 +123,10 @@ class WeaverCore(val policy: Policy = Policy()) {
         val comfortable = s.capacity >= goal + policy.slackMargin && cool
 
         hotSecs = if (hot) hotSecs + 1 else 0
-        belowSecs = if (below && !hot) belowSecs + 1 else 0
-        slackSecs = if (comfortable && !below) slackSecs + 1 else 0
+        val resting = restPace != null
+        belowSecs = if (below && !hot && !resting) belowSecs + 1 else 0
+        slackSecs = if (comfortable && !below && !resting) slackSecs + 1 else 0
+        restCoolSecs = if (resting && cool && !hot) restCoolSecs + 1 else 0
 
         val byKey = chips.associateBy { it.key }
         val order = cutOrder.mapNotNull { byKey[it] } + chips.filter { it.key !in cutOrder }
@@ -125,8 +136,20 @@ class WeaverCore(val policy: Policy = Policy()) {
 
         if (hotSecs >= policy.hotSeconds) {
             val why = "heat ${f3(s.heat)} > ${f2(limit!!)}"
-            val pick = order.firstOrNull { it.canLower } ?: return floor(why)
+            val pick = order.firstOrNull { it.canLower } ?: return rest(s, why)
             return lower(pick, why, nowSec)
+        }
+        if (resting) {
+            if (restCoolSecs >= policy.slackSeconds) {
+                val next = restPace!! * 2
+                restPace = if (next >= goal) null else next
+                restCoolSecs = 0
+                cooldown = policy.cooldownSeconds
+                resetWindows()
+                val why = "heat ${f2(s.heat)} < ${f2((limit ?: 1f) - policy.coolMargin)} for ${policy.slackSeconds} s"
+                return Decision.Rest(restPace, if (restPace == null) "$why → rest lifted" else "$why → rest eased to ${f1(restPace!!)}/s")
+            }
+            return Decision.Hold("resting at ${f1(restPace!!)}/s — ${if (cool) "cooling ${restCoolSecs}/${policy.slackSeconds} s" else "waiting to cool"}")
         }
         if (belowSecs >= policy.violationSeconds) {
             val why = "${f2(s.metric)}/s < goal ${f1(goal)} for $belowSecs s"
@@ -194,6 +217,24 @@ class WeaverCore(val policy: Policy = Policy()) {
         return Decision.Raise(c.key, why)
     }
 
+    private fun rest(s: Sense, why: String): Decision {
+        val cur = restPace
+        val next = when {
+            cur == null -> maxOf(1.0, minOf(goal, maxOf(s.metric, 1.0)) / 2)
+            cur > 1.0 -> maxOf(1.0, cur / 2)
+            cur > REST_MIN -> REST_MIN
+            else -> return floor("$why at ${f1(REST_MIN)}/s rest")
+        }
+        restPace = next
+        restCoolSecs = 0
+        cooldown = policy.cooldownSeconds * 2 // heat lags: give it 10 s to respond
+        resetWindows()
+        return Decision.Rest(next, "$why with every chiplet at its lowest profile → rest: ${f1(next)}/s")
+    }
+
+    /** Leave rest immediately (mode change, new goal). */
+    fun clearRest() { restPace = null; restCoolSecs = 0 }
+
     private fun floor(why: String): Decision {
         resetWindows()
         val first = !floorNoted
@@ -204,6 +245,8 @@ class WeaverCore(val policy: Policy = Policy()) {
     companion object {
         const val THERMAL_SEVERE = 3
         const val PLAN_SECONDS = 3
+        /** Deepest rest: one unit every 5 s (keeps the pipeline alive and the UI responsive). */
+        const val REST_MIN = 0.2
         fun f1(v: Double) = String.format(Locale.US, "%.1f", v)
         fun f2(v: Double) = String.format(Locale.US, "%.2f", v)
         fun f2(v: Float) = String.format(Locale.US, "%.2f", v)

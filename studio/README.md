@@ -117,3 +117,16 @@ Dashboard / adb: `adb shell am broadcast -a com.loom.studio.CONTROL -p com.loom.
 inside the model. Studio now decodes the EfficientDet anchors (levels 3–7, 9 per cell, scale 3.0) and runs NMS.
 On a reference image, the bus and three people come out within a few pixels of ground truth
 (`AnchorDecoderTest`, `ClassifierTest`). Cards imported before this fix upgrade themselves automatically.
+
+## Heat fixes from the 11 Oct session log (v1.1.1)
+
+The dashboard log showed heat at 0.92–0.97 for about 20 minutes. The causes, both fixed:
+
+1. **No lever left at the floor.** With every chiplet at ECO, the Weaver only logged "lowest useful profile"
+   and kept processing 10 frames/s on the CPU (CPU about 70 °C, about 1.3 A). It now **rests**: it halves the
+   processed rate every 10 s while still hot (goal/2 → … → 1/s → one frame per 5 s), then eases it back ×2
+   every 10 s once heat is below limit − 0.08. See `WeaverCoreTest.restWhenHotAtFloorThenLift`.
+2. **Project models with different input sizes.** After switching from `detector_large` (448²) to
+   `detector_small` (320²), Preprocess still produced 448² tensors. 9 521 frames failed with a size error,
+   while the camera and preprocessing kept running at about 0.9 A for nothing. Preprocess and Postprocess now
+   follow the tensor signature of the model that is live (also during Profile).

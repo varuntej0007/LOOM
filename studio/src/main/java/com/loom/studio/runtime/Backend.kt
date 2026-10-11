@@ -27,6 +27,9 @@ interface Session : AutoCloseable {
     /** Kernel thread id that runs inference (for ADPF CPU hints), or -1. */
     val tid: Int
     fun run(inputs: Map<String, Any>): Map<String, Any>
+    /** Tensor signature of THIS loaded model (profiles may load different files), or null if unknown. */
+    val inputSpecs: List<com.loom.studio.importer.TensorSpec>? get() = null
+    val outputSpecs: List<com.loom.studio.importer.TensorSpec>? get() = null
     fun generate(prompt: String, params: GenParams, onToken: (String) -> Unit) {
         throw UnsupportedOperationException("$label does not generate text")
     }

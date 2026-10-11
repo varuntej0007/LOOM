@@ -7,6 +7,7 @@ import android.graphics.Paint
 import androidx.camera.core.ImageProxy
 import com.loom.studio.importer.Classifier
 import com.loom.studio.importer.ModelCard
+import com.loom.studio.importer.TensorSpec
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
@@ -17,22 +18,44 @@ import java.nio.ByteOrder
  */
 class Preprocess(card: ModelCard) : FixedChiplet("Preprocess", "preprocess", "rotate + resize") {
 
-    private val spec = card.inputs.first()
-    private val img = Classifier.imageLayout(spec) ?: error("model input ${spec.shapeText} is not an image")
-    val inputW = img.w
-    val inputH = img.h
-    private val channels = img.c
+    private var spec = card.inputs.first()
+    private var img = Classifier.imageLayout(spec) ?: error("model input ${spec.shapeText} is not an image")
+    var inputW = img.w
+        private set
+    var inputH = img.h
+        private set
+    private var channels = img.c
     private val mean = card.normMean
     private val std = if (card.normStd == 0f) 1f else card.normStd
 
-    private val bytesPerValue = when (spec.dtype) { "float32" -> 4; "float16" -> 2; else -> 1 }
+    private fun bytesPer(dtype: String) = when (dtype) { "float32" -> 4; "float16" -> 2; else -> 1 }
     /** The tensor handed to Inference. Valid until the next frame. */
-    val input: ByteBuffer = ByteBuffer.allocateDirect(inputW * inputH * channels * bytesPerValue).order(ByteOrder.nativeOrder())
+    var input: ByteBuffer = ByteBuffer.allocateDirect(inputW * inputH * channels * bytesPer(spec.dtype)).order(ByteOrder.nativeOrder())
+        private set
 
     private var raw: Bitmap? = null
     private var upright: Bitmap? = null
-    private val scaled: Bitmap = Bitmap.createBitmap(inputW, inputH, Bitmap.Config.ARGB_8888)
-    private val pixels = IntArray(inputW * inputH)
+    private var scaled: Bitmap = Bitmap.createBitmap(inputW, inputH, Bitmap.Config.ARGB_8888)
+    private var pixels = IntArray(inputW * inputH)
+
+    /**
+     * Follow the model that is live now. A project can switch between models with different
+     * input sizes (e.g. detector_large 448² ↔ detector_small 320²). Pipeline thread only.
+     * Returns true if the tensor layout changed.
+     */
+    fun retarget(newSpec: TensorSpec): Boolean {
+        if (newSpec == spec) return false
+        val l = Classifier.imageLayout(newSpec) ?: return false
+        spec = newSpec
+        img = l
+        inputW = l.w
+        inputH = l.h
+        channels = l.c
+        input = ByteBuffer.allocateDirect(inputW * inputH * channels * bytesPer(spec.dtype)).order(ByteOrder.nativeOrder())
+        scaled = Bitmap.createBitmap(inputW, inputH, Bitmap.Config.ARGB_8888)
+        pixels = IntArray(inputW * inputH)
+        return true
+    }
     private val matrix = Matrix()
     private val paint = Paint(Paint.FILTER_BITMAP_FLAG)
     @Volatile private var lastMs = 0.0

@@ -58,6 +58,24 @@ class LiteRtSession private constructor(
     }
     @Volatile private var closed = false
 
+    override val inputSpecs: List<com.loom.studio.importer.TensorSpec> =
+        (0 until interpreter.inputTensorCount).map { spec(interpreter.getInputTensor(it), "input$it") }
+    override val outputSpecs: List<com.loom.studio.importer.TensorSpec> =
+        (0 until interpreter.outputTensorCount).map { spec(interpreter.getOutputTensor(it), "output$it") }
+
+    private fun spec(t: org.tensorflow.lite.Tensor, fallback: String) = com.loom.studio.importer.TensorSpec(
+        t.name() ?: fallback, t.shape(),
+        when (t.dataType()) {
+            org.tensorflow.lite.DataType.FLOAT32 -> "float32"
+            org.tensorflow.lite.DataType.UINT8 -> "uint8"
+            org.tensorflow.lite.DataType.INT8 -> "int8"
+            org.tensorflow.lite.DataType.INT32 -> "int32"
+            org.tensorflow.lite.DataType.INT64 -> "int64"
+            else -> "unknown"
+        },
+        t.quantizationParams().scale, t.quantizationParams().zeroPoint,
+    )
+
     override fun run(inputs: Map<String, Any>): Map<String, Any> {
         check(!closed) { "session closed" }
         return exec.submit(Callable {
