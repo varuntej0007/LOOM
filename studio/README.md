@@ -87,3 +87,33 @@ streaming.
 - [x] M10: NPU profiles (NNAPI for tflite, QNN HTP for onnx), measured like the others
 
 The boxes mean the code is written. Each still has to be confirmed on the iQOO 15.
+
+## LOOM Guard: cool any app (v1.1)
+
+Guard keeps the whole phone under a heat limit while **any** app is in front: games, Camera, video.
+It runs in the background run service. One step at a time, with hysteresis like the Weaver, it changes
+phone-wide settings:
+
+| Level | Lever | Permission (no root) |
+|---|---|---|
+| 1 | screen brightness → 60 % | Modify system settings (app-op) |
+| 2 | peak refresh rate → 60 Hz | WRITE_SECURE_SETTINGS (`adb pm grant`, done by build_studio.bat) |
+| 3 | Android battery saver | WRITE_SECURE_SETTINGS |
+
+- It steps up after 10 s above the limit (3 s at SEVERE). It steps down after 30 s below limit − 0.08.
+- Every original value is saved first and restored when the phone cools down, Guard is switched off, or the
+  service stops. Values are also restored on the next start after a crash.
+- Each decision is a `LOOM_EVT` line. `LOOM_LIVE` carries a `guard` object
+  (`on, level, levers, limit, fg_app, last, decisions, perms`). The dashboard shows a Guard strip and on/off buttons.
+- It does not change another app's code or the CPU/GPU clocks directly. If a vendor ROM ignores the AOSP
+  refresh key, Guard says so in its log; it doesn't claim the cap worked.
+- The optional heat pill over other apps needs "Display over other apps". The front-app name needs "Usage access".
+
+Dashboard / adb: `adb shell am broadcast -a com.loom.studio.CONTROL -p com.loom.studio --es cmd guard --es value on|off|0.75`
+
+## Detector fix (v1.1)
+
+`efficientdet_lite0/2.tflite` have a raw head: `[1,19206,4]` box offsets plus `[1,19206,90]` scores, with no NMS
+inside the model. Studio now decodes the EfficientDet anchors (levels 3–7, 9 per cell, scale 3.0) and runs NMS.
+On a reference image, the bus and three people come out within a few pixels of ground truth
+(`AnchorDecoderTest`, `ClassifierTest`). Cards imported before this fix upgrade themselves automatically.

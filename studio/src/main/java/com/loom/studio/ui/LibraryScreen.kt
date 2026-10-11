@@ -119,6 +119,7 @@ fun LibraryScreen(
                     onToggleService = { on -> if (on) onStartService() else onStopService() },
                 )
             }
+            item { GuardCard(full = false, onStartService = onStartService) }
             if (importProgress != null) {
                 item {
                     LoomCard {

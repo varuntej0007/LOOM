@@ -107,6 +107,7 @@ class RunService : Service() {
         val s = DeviceSignals(applicationContext).also { it.start() }
         signals = s
         StudioApp.instance.runtime.signals = s
+        StudioApp.instance.guard.onServiceStart()
         registerControl()
         loop = Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "loom-studio-tick") }.also {
             it.scheduleWithFixedDelay(::tick, 1, 1, TimeUnit.SECONDS)
@@ -131,14 +132,20 @@ class RunService : Service() {
                 val heat = if (l.heat.isNaN()) "—" else String.format(Locale.US, "%.2f", l.heat)
                 val ma = l.batteryUa?.let { String.format(Locale.US, "%d mA", it / 1000) } ?: "— mA"
                 getSystemService(NotificationManager::class.java)
-                    .notify(NOTIFICATION_ID, buildNotification("Heat $heat · $ma · ${l.thermalStatus} · ${l.run.status}"))
+                    .notify(NOTIFICATION_ID, buildNotification("Heat $heat · $ma · ${l.thermalStatus} · ${l.run.status}" + guardText()))
             } catch (_: Throwable) { }
         }
+    }
+
+    private fun guardText(): String {
+        val g = StudioApp.instance.guard.state.value
+        return if (!g.enabled) "" else if (g.levers.isEmpty()) " · Guard watching" else " · Guard: " + g.levers.joinToString(", ")
     }
 
     override fun onDestroy() {
         loop?.shutdownNow()
         loop = null
+        try { StudioApp.instance.guard.onServiceStop() } catch (t: Throwable) { Log.e(TAG, "guard stop", t) }
         control?.let { try { unregisterReceiver(it) } catch (_: Throwable) { } }
         control = null
         StudioApp.instance.runtime.signals = null

@@ -19,6 +19,20 @@
     <!-- Keeps the 1 Hz telemetry and the Weaver ticking with the screen off (normal permission). -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
+    <!-- LOOM Guard (phone-wide cooling while any app runs). All optional, all user/adb-granted,
+         none needs root:
+           SYSTEM_ALERT_WINDOW   heat pill over other apps   ("Display over other apps")
+           WRITE_SETTINGS        screen brightness            ("Modify system settings")
+           WRITE_SECURE_SETTINGS 60 Hz cap + battery saver    (adb pm grant, by build_studio.bat)
+           PACKAGE_USAGE_STATS   name of the app on screen     ("Usage access"; log only) -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.WRITE_SETTINGS"
+        tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS"
+        tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
+
     <!-- Android 11+ package visibility: bind the phone's text-to-speech engine (Voice chiplet). -->
     <queries>
         <intent>
@@ -59,7 +73,7 @@
             android:foregroundServiceType="specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="On-device AI model host: runs user-imported models locally and adapts them to device heat and battery" />
+                android:value="On-device AI model host and heat guard: runs user-imported models locally, adapts them to device heat and battery, and keeps the phone cool while other apps run" />
         </service>
     </application>
 </manifest>

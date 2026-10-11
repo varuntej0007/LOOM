@@ -20,6 +20,14 @@ class ClassifierTest {
         assertTrue(r.confidence >= 0.9f)
     }
 
+    /** The real efficientdet_lite0.tflite LOOM ships: raw head, no NMS inside the model. */
+    @Test fun efficientDetLite0Raw_isAnchorDetector() {
+        val outs = listOf(t(1, 19206, 90), t(1, 19206, 4))
+        val r = cls(listOf(t(1, 320, 320, 3)), outs)
+        assertEquals(TaskKind.VISION, r.kind); assertEquals(Head.DETECTOR, r.head)
+        assertTrue(Classifier.isAnchorDetector(outs))
+    }
+
     @Test fun ssdMobileNet_isDetector() {
         val r = cls(listOf(t(1, 300, 300, 3, dtype = "uint8")), listOf(t(1, 10, 4), t(1, 10), t(1, 10), t(1)))
         assertEquals(Head.DETECTOR, r.head)

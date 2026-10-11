@@ -46,6 +46,7 @@ ALLOWED = {
     "heat": {"off", "0.70", "0.75", "0.80", "0.85"},
     "pacing": {"on", "off"},
     "run": {"toggle"},
+    "guard": {"on", "off", "0.70", "0.75", "0.80"},
     "voice": {"on", "off"},
     "overlay": {"on", "off", "toggle"},
 }

@@ -66,6 +66,12 @@ object Classifier {
         return Result(TaskKind.GENERIC, Head.NONE, 0.5f, listOf("input ${in0.shapeText} ${in0.dtype} matches no known pattern — raw tensors in, numbers out"))
     }
 
+    /** Raw anchor head ([1,N,4] + [1,N,C]); used to upgrade cards imported before this rule existed. */
+    fun isAnchorDetector(outputs: List<TensorSpec>): Boolean {
+        val b = outputs.firstOrNull { it.shape.size == 3 && it.shape[2] == 4 } ?: return false
+        return outputs.any { it !== b && it.shape.size == 3 && it.shape[1] == b.shape[1] }
+    }
+
     private fun classifyTask(hint: String?): Result {
         val h = hint?.lowercase() ?: ""
         return when {
@@ -89,6 +95,10 @@ object Classifier {
             val perBox = outputs.count { o -> o !== boxes && o.shape.size == 2 && o.shape[1] == n }
             if (perBox >= 2 || (perBox >= 1 && outputs.size >= 3)) {
                 return Triple(Head.DETECTOR, 0.95f, "outputs: boxes ${boxes.shapeText} + scores/classes [1,$n] → SSD-style detector")
+            }
+            val raw = outputs.firstOrNull { o -> o !== boxes && o.shape.size == 3 && o.shape[1] == n && o.shape[2] >= 1 }
+            if (raw != null) {
+                return Triple(Head.DETECTOR, 0.9f, "outputs: box offsets ${boxes.shapeText} + class scores ${raw.shapeText} per anchor → anchor-based detector (LOOM decodes anchors + NMS)")
             }
         }
         if (outputs.size == 1) {

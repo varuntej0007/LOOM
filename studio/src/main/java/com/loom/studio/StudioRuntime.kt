@@ -298,8 +298,18 @@ class StudioRuntime(private val app: Context, private val telemetry: TelemetryBu
     /** Once per second from the run service. */
     fun tick(s: DeviceSignals) {
         val a = _active.value
+        val guard = StudioApp.instance.guard
+        guard.tick(s)
+        val g = guard.state.value
+        telemetry.guard = g
         if (a == null) {
-            telemetry.run = RunContext(stress = stress.mode.name)
+            telemetry.run = if (g.enabled) RunContext(
+                stress = stress.mode.name,
+                status = "Guard · cooling any app" + (g.foreground?.let { " ($it)" } ?: ""),
+                decision = if (g.levers.isEmpty()) "heat under ${"%.2f".format(Locale.US, g.limit)} — nothing to cool" else "on: " + g.levers.joinToString(" · ") + " — " + g.last,
+                decisions = g.decisions,
+                heatLimit = g.limit,
+            ) else RunContext(stress = stress.mode.name)
         } else {
             a.weaver.tick(s, telemetry)
             val c = _compare.value
@@ -311,7 +321,7 @@ class StudioRuntime(private val app: Context, private val telemetry: TelemetryBu
     /**
      * Dashboard / adb control (same command names as app/):
      *   adb shell am broadcast -a com.loom.studio.CONTROL -p com.loom.studio --es cmd stress --es value gpu
-     * Commands: stress off|gpu|cpu · mode adaptive|fixed|manual · goal <n> · heat off|<0.xx>
+     * Commands: stress off|gpu|cpu · mode adaptive|fixed|manual · goal <n> · heat off|<0.xx> · guard on|off|<0.xx>
      */
     fun control(cmd: String, value: String) {
         val w = _active.value?.weaver
@@ -328,6 +338,11 @@ class StudioRuntime(private val app: Context, private val telemetry: TelemetryBu
             "heat" -> if (value.equals("off", true)) w?.setHeatLimit(null)
                 else value.toFloatOrNull()?.takeIf { it in 0.3f..1.2f }?.let { w?.setHeatLimit(it) }
             "run" -> if (_compare.value == null) startCompare(15) else cancelCompare()
+            "guard" -> when (value.lowercase()) {
+                "on" -> StudioApp.instance.guard.enabled = true
+                "off" -> StudioApp.instance.guard.enabled = false
+                else -> value.toFloatOrNull()?.takeIf { it in 0.5f..1.0f }?.let { StudioApp.instance.guard.limit = it }
+            }
         }
     }
 

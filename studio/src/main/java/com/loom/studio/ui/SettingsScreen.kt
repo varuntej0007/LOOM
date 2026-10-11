@@ -27,6 +27,7 @@ import java.util.Locale
 @Composable
 fun SettingsScreen(onBack: () -> Unit) {
     val rt = StudioApp.instance.runtime
+    val ctx = androidx.compose.ui.platform.LocalContext.current
     var heat by remember { mutableStateOf(rt.defaultHeatLimit) }
     var tele by remember { mutableStateOf(rt.telemetryOn) }
     var msg by remember { mutableStateOf<String?>(null) }
@@ -36,6 +37,7 @@ fun SettingsScreen(onBack: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item { BackRow("Settings", onBack) }
+        item { GuardCard(full = true, onStartService = { com.loom.studio.service.RunService.start(ctx) }) }
         item {
             LoomCard {
                 SectionTitle("Default heat limit", "Used for newly opened models (each model can override it)")
@@ -67,8 +69,9 @@ fun SettingsScreen(onBack: () -> Unit) {
         item {
             LoomCard {
                 SectionTitle("About")
-                Text("LOOM Studio (Plan B) — runs imported on-device models inside LOOM's virtual-chiplet runtime and keeps them " +
-                    "within a heat limit. It manages only the AI it runs itself; it cannot change other apps or the phone's clocks. " +
+                Text("LOOM Studio (Plan B) runs imported on-device models inside LOOM's virtual-chiplet runtime and keeps them " +
+                    "within a heat limit. LOOM Guard also keeps the phone cool while other apps run, using phone-wide settings " +
+                    "(brightness, refresh rate, battery saver). It cannot change another app's code or the CPU clocks directly. " +
                     "Fully offline: no internet permission.", fontSize = 13.sp, color = Loom.Ink)
             }
         }

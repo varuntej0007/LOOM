@@ -15,12 +15,16 @@ class StudioApp : Application() {
         private set
     lateinit var runtime: StudioRuntime
         private set
+    /** LOOM Guard: phone-wide cooling while any app runs. */
+    lateinit var guard: com.loom.studio.guard.Guard
+        private set
 
     override fun onCreate() {
         super.onCreate()
         instance = this
         telemetry = TelemetryBus(this)
         runtime = StudioRuntime(this, telemetry)
+        guard = com.loom.studio.guard.Guard(this, telemetry)
     }
 
     companion object {

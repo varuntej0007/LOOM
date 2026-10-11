@@ -97,8 +97,37 @@ class Postprocess(card: ModelCard, private val scoreThreshold: Float = 0.4f) :
 
     private fun detect(unit: Long, out: Map<String, Any>): UnitResult {
         val boxIdx = outputs.indexOfFirst { it.shape.size == 3 && it.shape[2] == 4 }
-        if (boxIdx >= 0 && outputs.size >= 3) return detectSsd(unit, out, boxIdx)
+        if (boxIdx >= 0) {
+            val n = outputs[boxIdx].shape[1]
+            val rawIdx = outputs.indices.firstOrNull { it != boxIdx && outputs[it].shape.size == 3 && outputs[it].shape[1] == n }
+            if (rawIdx != null) return detectAnchors(unit, out, boxIdx, rawIdx)
+            if (outputs.size >= 3) return detectSsd(unit, out, boxIdx)
+        }
         return detectYolo(unit, out)
+    }
+
+    /** Raw EfficientDet-style head: box offsets [1,N,4] + class scores [1,N,C], decoded here (anchors + NMS). */
+    private fun detectAnchors(unit: Long, out: Map<String, Any>, boxIdx: Int, scoreIdx: Int): UnitResult {
+        val n = outputs[boxIdx].shape[1]
+        val c = outputs[scoreIdx].shape[2]
+        val box = reader(out, boxIdx)
+        val score = reader(out, scoreIdx)
+        val raw = AnchorDecoder.decode(n, c, inputH, inputW, scoreThreshold, box, score)
+        val name: (Int) -> String = if (c == rawLabels.size) ::plainLabel else ::label
+        return UnitResult(unit, boxes = raw.map { Det(name(it.cls), it.score, it.left, it.top, it.right, it.bottom) })
+    }
+
+    /** Random access into one output without copying it (a raw head is ~1.7 M floats per frame). */
+    private fun reader(out: Map<String, Any>, index: Int): AnchorDecoder.Reader {
+        val buf = (out[index.toString()] as? ByteBuffer) ?: return AnchorDecoder.Reader { 0f }
+        val spec = outputs[index]
+        val b = buf.duplicate().order(ByteOrder.nativeOrder())
+        b.rewind()
+        return when (spec.dtype) {
+            "uint8" -> AnchorDecoder.Reader { i -> deq(b.get(i).toInt() and 0xFF, spec) }
+            "int8" -> AnchorDecoder.Reader { i -> deq(b.get(i).toInt(), spec) }
+            else -> { val fb = b.asFloatBuffer(); AnchorDecoder.Reader { i -> fb.get(i) } }
+        }
     }
 
     private fun detectSsd(unit: Long, out: Map<String, Any>, boxIdx: Int): UnitResult {

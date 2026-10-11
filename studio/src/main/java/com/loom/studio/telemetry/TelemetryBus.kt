@@ -93,6 +93,8 @@ class TelemetryBus(private val appContext: Context) {
     val live: StateFlow<LiveSnapshot> = _live
 
     @Volatile var enabled: Boolean = true
+    /** LOOM Guard state, sent as the "guard" object on LOOM_LIVE (null = not reported). */
+    @Volatile var guard: com.loom.studio.guard.GuardState? = null
     private var lines = 0L
 
     /** Called once per second by the run service (later: by the Weaver tick). */
@@ -176,6 +178,7 @@ class TelemetryBus(private val appContext: Context) {
             .put("units", r.units)
             .put("adpf", r.adpf)
             .put("quality", r.quality?.let { numD(it) } ?: NULL)
+            .put("guard", guard?.json() ?: NULL)
 
         if (enabled) Log.i(LIVE_TAG, j.toString())
         lines++

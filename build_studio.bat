@@ -220,6 +220,20 @@ call :log PASS "sample models and LOOM projects copied to the phone's Download f
 rem Notification permission up front (Android 13+), so the run-service notification is visible.
 "%ADB%" -s %DEVICE% shell pm grant com.loom.studio android.permission.POST_NOTIFICATIONS >nul 2>&1
 
+rem LOOM Guard (cool any app): one-time grants over USB. No root. WRITE_SECURE_SETTINGS lets Guard
+rem cap the refresh rate at 60 Hz and switch on battery saver; the app-ops below are the same
+rem switches the user could flip in Settings (overlay pill, brightness, front-app name).
+"%ADB%" -s %DEVICE% shell appops set com.loom.studio SYSTEM_ALERT_WINDOW allow >nul 2>&1
+"%ADB%" -s %DEVICE% shell appops set com.loom.studio WRITE_SETTINGS allow >nul 2>&1
+"%ADB%" -s %DEVICE% shell appops set com.loom.studio GET_USAGE_STATS allow >nul 2>&1
+"%ADB%" -s %DEVICE% shell pm grant com.loom.studio android.permission.WRITE_SECURE_SETTINGS > "%LOGS%\guard_grant.log" 2>&1
+"%ADB%" -s %DEVICE% shell dumpsys package com.loom.studio | findstr /C:"WRITE_SECURE_SETTINGS: granted=true" >nul 2>&1
+if errorlevel 1 (
+  call :log WARN "Guard: WRITE_SECURE_SETTINGS not granted - 60 Hz cap and battery saver stay off (brightness still works). See loom_studio_logs\guard_grant.log; on some phones enable Developer options - 'Disable permission monitoring' or 'USB debugging (Security settings)' and re-run."
+) else (
+  call :log PASS "Guard permissions granted (overlay, brightness, 60 Hz cap, battery saver, usage access)"
+)
+
 "%ADB%" -s %DEVICE% logcat -c >nul 2>&1
 "%ADB%" -s %DEVICE% shell am start -n com.loom.studio/.MainActivity >nul
 call :log PASS "launched LOOM Studio"

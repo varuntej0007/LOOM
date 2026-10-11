@@ -166,7 +166,12 @@ class ModelStore(context: Context) {
                 overridden = j.optBoolean("overridden", false),
                 innerFile = if (j.isNull("inner_file")) null else j.optString("inner_file").ifEmpty { null },
                 projectFile = if (j.isNull("project_file")) null else j.optString("project_file").ifEmpty { null },
-            )
+            ).let { c ->
+                // Cards imported before the anchor-detector rule: upgrade them in place.
+                if (!c.overridden && c.kind == TaskKind.VISION && c.head == Head.NONE && Classifier.isAnchorDetector(c.outputs))
+                    c.copy(head = Head.DETECTOR, reasons = c.reasons + "box offsets + per-anchor class scores → anchor-based detector")
+                else c
+            }
         }
     }
 }

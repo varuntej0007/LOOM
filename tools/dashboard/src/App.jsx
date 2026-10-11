@@ -496,11 +496,40 @@ function Controls({ d, sim }) {
         <div className="group"><span>Benchmark</span>
           <button className="solo" onClick={() => send("run", "toggle")}>{d?.run ? "Stop run" : "Start 15-min run"}</button>
         </div>
+        {d?.app === "studio" && (
+          <div className="group"><span>Guard (any app)</span>
+            <div className="seg">
+              {[["On", "on"], ["Off", "off"], ["0.70", "0.70"], ["0.75", "0.75"], ["0.80", "0.80"]].map(([label, value]) => (
+                <button key={value} className={sel.guard === value ? "sel" : ""} onClick={() => send("guard", value)}>{label}</button>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="group"><span>Phone</span>
           <button className="solo" onClick={() => send("overlay", "toggle")}>Engineering view</button>
         </div>
       </div>
       <div className="toast" role="status">{toast}</div>
+    </section>
+  );
+}
+
+/* LOOM Guard (Studio): phone-wide cooling while any app runs. */
+function GuardPanel({ d }) {
+  const g = d?.guard;
+  if (!g) return null;
+  const perms = g.perms || {};
+  const missing = [["overlay", "heat pill"], ["write_settings", "brightness"], ["secure", "60 Hz + saver"], ["usage", "front app"]]
+    .filter(([k]) => !perms[k] && !(k === "write_settings" && perms.secure)).map(([, l]) => l);
+  return (
+    <section className="card guard" aria-label="LOOM Guard">
+      <span className="tag">LOOM Guard · any app</span>
+      <span className="gstate">{!g.on ? "off" : g.levers.length ? `cooling: ${g.levers.join(" · ")}` : "watching · nothing to cool"}</span>
+      <span className="gmeta">
+        limit {Number(g.limit).toFixed(2)}{g.fg_app ? ` · front app ${g.fg_app}` : ""} · {g.decisions} decisions
+        {missing.length ? ` · missing: ${missing.join(", ")}` : ""}
+      </span>
+      {g.on && g.last && g.last !== "—" && <span className="glast">{g.last}</span>}
     </section>
   );
 }
@@ -515,6 +544,7 @@ export default function App() {
       <main className="wrap">
         <Banner status={s.status} />
         <Kpis d={s.live} base={s.base} />
+        <GuardPanel d={s.live} />
         <ChipletBoard state={s} now={now} />
         <section className="trio">
           <HotSwap state={s} now={now} />
